@@ -43,7 +43,6 @@ INSTALLED_APPS = [
     'accounts',
     'academics',
     'student_portal',
-    'results',
     'core',
 ]
 

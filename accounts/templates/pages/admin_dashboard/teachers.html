@@ -1,0 +1,246 @@
+
+    {% extends "base/admin_d.html" %}
+
+    {% load static %}
+
+    {% block title %}
+        Teachers 
+    {% endblock title %}
+
+    {% block extra_css %}
+      <link rel="stylesheet" href="{% static 'styles/pages/teachers.css' %}">
+    {% endblock extra_css %}
+
+    {% block content %}
+
+        <main class="main-content">
+            <div class="page-header">
+                <div class="header-top">
+                    <div class="page-title">
+                        <span class="icon"><i class="bi bi-person-badge"></i></span>
+                        <div>
+                            <h1>Teachers</h1>
+                            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 4px;">Manage all teaching staff</p>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary">
+                            <i class="bi bi-download"></i> Export
+                        </button>
+                        <button class="btn btn-primary" id="openModal">
+                            <i class="bi bi-plus-lg"></i> Add Teacher
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-box">
+                        <div class="stat-value">{{ total_teachers|default:0 }}</div>
+                        <div class="stat-label">Total Teachers</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">{{ full_time_teachers|default:0 }}</div>
+                        <div class="stat-label">Full Time</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">{{ part_time_teachers|default:0 }}</div>
+                        <div class="stat-label">Part Time</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">{{ contract_teachers|default:0 }}</div>
+                        <div class="stat-label">Contract</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filters-bar">
+                <form method="get">
+                    <div class="filters-grid">
+                        <div class="filter-group">
+                            <label><i class="bi bi-search"></i> Search</label>
+                            <input type="text" name="search" class="form-control" placeholder="Search by name or ID..." value="{{ search|default:'' }}">
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="bi bi-briefcase"></i> Employment Type</label>
+                            <select name="employment_type" class="form-control">
+                                <option value="">All Types</option>
+                                {% for key, label in employment_types %}
+                                    <option value="{{ key }}" {% if emp_type == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label><i class="bi bi-bar-chart-line"></i> Status</label>
+                            <select name="status" class="form-control">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                                <i class="bi bi-funnel"></i> Filter
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="teachers-grid">
+                <div class="teacher-card">
+                    <div class="teacher-header">
+                        <div class="teacher-avatar" style="background: var(--primary);">KO</div>
+                        <div class="teacher-name">Mr. Kwame Owusu</div>
+                        <div class="teacher-id">EMP-2023-001</div>
+                    </div>
+                    <div class="teacher-body">
+                        <div class="info-row">
+                            <div class="info-icon" style="background: #d1fae5; color: var(--secondary);">
+                                <i class="bi bi-briefcase"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Employment</div>
+                                <div class="info-value">Full Time</div>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-icon" style="background: #ede9fe; color: var(--purple);">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Students</div>
+                                <div class="info-value">214 Students</div>
+                            </div>
+                        </div>
+                        <div class="subjects-tags">
+                            <span class="subject-tag">ICT</span>
+                            <span class="subject-tag">Computer Science</span>
+                        </div>
+                    </div>
+                    <div class="teacher-footer">
+                        <button class="btn btn-secondary btn-sm"><i class="bi bi-eye"></i> View</button>
+                        <button class="btn btn-primary btn-sm"><i class="bi bi-pencil-square"></i> Edit</button>
+                    </div>
+                </div>
+
+                <div class="teacher-card">
+                    <div class="teacher-header">
+                        <div class="teacher-avatar" style="background: #ec4899;">EO</div>
+                        <div class="teacher-name">Mrs. Esi Osei</div>
+                        <div class="teacher-id">EMP-2023-058</div>
+                    </div>
+                    <div class="teacher-body">
+                        <div class="info-row">
+                            <div class="info-icon" style="background: #dbeafe; color: var(--primary);">
+                                <i class="bi bi-envelope"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Email</div>
+                                <div class="info-value">e.osei@christacademy.edu</div>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-icon" style="background: #fee2e2; color: var(--danger);">
+                                <i class="bi bi-briefcase"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Employment</div>
+                                <div class="info-value">Contract</div>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-icon" style="background: #ede9fe; color: var(--purple);">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Students</div>
+                                <div class="info-value">189 Students</div>
+                            </div>
+                        </div>
+                        <div class="subjects-tags">
+                            <span class="subject-tag">French</span>
+                            <span class="subject-tag">Spanish</span>
+                        </div>
+                    </div>
+                    <div class="teacher-footer">
+                        <button class="btn btn-secondary btn-sm"><i class="bi bi-eye"></i> View</button>
+                        <button class="btn btn-primary btn-sm"><i class="bi bi-pencil-square"></i> Edit</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pagination">
+                <button class="page-btn" disabled><i class="bi bi-arrow-left"></i> Previous</button>
+                <button class="page-btn active">1</button>
+                <button class="page-btn">2</button>
+                <button class="page-btn">3</button>
+                <button class="page-btn">4</button>
+                <button class="page-btn">5</button>
+                <button class="page-btn">Next <i class="bi bi-arrow-right"></i></button>
+            </div>
+        </main>
+
+        <div id="teacherModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>➕ Add New Teacher</h2>
+                    <button class="modal-close closeModal">✕</button>
+                </div>
+                <form id="teacherForm" data-url="{% url 'user_create' %}" data-csrf="{{ csrf_token }}">
+                    <div class="form-group">
+                        <label>Full Name *</label>
+                        <input type="text" class="form-control" placeholder="Enter full name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address *</label>
+                        <input type="email" class="form-control" placeholder="teacher@christacademy.edu" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Phone Number</label>
+                        <input type="tel" class="form-control" placeholder="+233 XX XXX XXXX">
+                    </div>
+                    <div class="form-group">
+                        <label>Employment Type *</label>
+                        <select class="form-control" required>
+                            <option value="">Select type...</option>
+                            <option value="full_time">Full Time</option>
+                            <option value="part_time">Part Time</option>
+                            <option value="contract">Contract</option>
+                            <option value="substitute">Substitute</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Subjects Teaching</label>
+                        <select class="form-control" multiple style="height: 120px;">
+                            <option>Mathematics</option>
+                            <option>English</option>
+                            <option>Science</option>
+                            <option>Social Studies</option>
+                            <option>ICT</option>
+                            <option>French</option>
+                            <option>Biology</option>
+                            <option>Chemistry</option>
+                            <option>Physics</option>
+                        </select>
+                        <small style="color: var(--text-secondary); font-size: 0.75rem;">Hold Ctrl/Cmd to select multiple</small>
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" style="width: 18px; height: 18px;">
+                            <span>Is Class Teacher</span>
+                        </label>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary closeModal" >Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Teacher</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    {% endblock content %}
+
+    {% block js %}
+        <script type="module" src="{% static 'scripts/JS/teachers.js' %}"></script>
+    {% endblock js %}

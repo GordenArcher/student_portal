@@ -14,7 +14,6 @@ urlpatterns = [
     path('users/<uuid:user_id>/delete/', views.user_delete, name='user_delete'),
     
     # Teacher Profiles
-    path('teachers/', views.teacher_list, name='teacher_list'),
     path('teachers/create/', views.teacher_create, name='teacher_create'),
     path('teachers/<int:teacher_id>/update/', views.teacher_update, name='teacher_update'),
     
@@ -31,7 +30,13 @@ urlpatterns = [
     path('api/users/<uuid:user_id>/', views.user_api_detail, name='user_api_detail'),
     
     # Dashboards
+        #Admin
     path('dashboard/admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('dashboard/admin/teachers/', views.teacher_list, name='teachers_list'),
+
+        #Teacher
     path('dashboard/teacher/', views.teacher_dashboard, name='teacher_dashboard'),
+
+        #Student
     path('dashboard/student/', views.student_dashboard, name='student_dashboard'),
 ]

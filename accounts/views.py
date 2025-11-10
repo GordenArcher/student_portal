@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.http import JsonResponse
@@ -11,6 +11,9 @@ from .models import User, TeacherProfile, StudentProfile, StaffProfile
 from academics.models import Subject, ClassLevel, Term, Result
 from django.utils import timezone
 from datetime import timedelta
+from django.db import transaction
+from .utils.generateID import generate_teacher_id
+from django.core.exceptions import PermissionDenied
 
 
 # ============ Authentication Views ============
@@ -49,6 +52,72 @@ def logout_view(request):
 
 
 # ============ User Management Views ============
+
+def is_admin(user):
+    return user.is_authenticated and user.role == 'admin'
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["GET", "POST"])
+@transaction.atomic
+def register_teacher_view(request):
+    """Allow only admins to register teachers"""
+    if request.method == "POST":
+        first_name = request.POST.get("first_name")
+        last_name = request.POST.get("last_name")
+        email = request.POST.get("email")
+        phone_number = request.POST.get("phone_number")
+        gender = request.POST.get("gender")
+        password = request.POST.get("password")
+        employment_type = request.POST.get("employment_type", "full_time")
+        is_class_teacher = request.POST.get("is_class_teacher") == "on"
+        class_teacher_of_id = request.POST.get("class_teacher_of")
+        subject_ids = request.POST.getlist("subjects")
+
+        # Validate email uniqueness
+        if User.objects.filter(email=email).exists():
+            messages.error(request, "A user with this email already exists.")
+            return redirect("register_teacher")
+
+        # Create user
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            role="teacher",
+            phone_number=phone_number,
+            gender=gender,
+        )
+
+        # Generate unique employee ID
+        employee_id = generate_teacher_id()
+
+        # Create teacher profile
+        teacher_profile = TeacherProfile.objects.create(
+            user=user,
+            employee_id=employee_id,
+            employment_type=employment_type,
+            is_class_teacher=is_class_teacher,
+            class_teacher_of=ClassLevel.objects.filter(id=class_teacher_of_id).first() if class_teacher_of_id else None
+        )
+
+        # Add subjects if selected
+        if subject_ids:
+            subjects = Subject.objects.filter(id__in=subject_ids)
+            teacher_profile.subjects.set(subjects)
+
+        messages.success(request, f"Teacher {user.get_full_name()} registered successfully with ID {employee_id}.")
+        return redirect("teachers_list")
+
+    # GET request – render registration form
+    context = {
+        "subjects": Subject.objects.all(),
+        "classes": ClassLevel.objects.all(),
+    }
+    return render(request, "accounts/register_teacher.html", context)
 
 @login_required
 def user_list(request):
@@ -105,41 +174,76 @@ def user_detail(request, user_id):
     return render(request, 'accounts/user_detail.html', context)
 
 
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def user_create(request):
-    """Create a new user"""
+    """Create a new user (Admin only). Works for both normal form and AJAX popup."""
+    if request.user.role != 'admin':
+        raise PermissionDenied("Only administrators can create new users.")
+
     if request.method == 'POST':
         try:
-            # Create user
+            username = request.POST.get('username') or request.POST.get('email').split('@')[0]
+            email = request.POST.get('email')
+            password = request.POST.get('password') or 'changeme123'
+            first_name = request.POST.get('first_name')
+            last_name = request.POST.get('last_name')
+            role = request.POST.get('role')
+            phone_number = request.POST.get('phone_number')
+            date_of_birth = request.POST.get('date_of_birth') or None
+            gender = request.POST.get('gender') or None
+            profile_picture = request.FILES.get('profile_picture')
+
+            if role == 'admin' and not request.user.is_superuser:
+                msg = "Only the system superuser can create another admin."
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'status': 'error', 'message': msg}, status=403)
+                messages.error(request, msg)
+                return redirect('user_create')
+
             user = User.objects.create_user(
-                username=request.POST.get('username'),
-                email=request.POST.get('email'),
-                password=request.POST.get('password'),
-                first_name=request.POST.get('first_name'),
-                last_name=request.POST.get('last_name'),
-                role=request.POST.get('role'),
-                phone_number=request.POST.get('phone_number'),
-                date_of_birth=request.POST.get('date_of_birth') or None,
-                gender=request.POST.get('gender') or None,
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                role=role,
+                phone_number=phone_number,
+                date_of_birth=date_of_birth,
+                gender=gender,
             )
-            
-            # Handle profile picture
-            if request.FILES.get('profile_picture'):
-                user.profile_picture = request.FILES['profile_picture']
+
+            if profile_picture:
+                user.profile_picture = profile_picture
                 user.save()
-            
-            messages.success(request, f'User {user.username} created successfully!')
-            return redirect('user_detail', user_id=user.id)
-            
+
+            success_msg = f"{user.get_full_name() or user.username} ({role}) created successfully!"
+
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'success', 'message': success_msg})
+
+            messages.success(request, success_msg)
+            if role == 'teacher':
+                return redirect('teachers_list')
+            elif role == 'student':
+                return redirect('students_list')
+            else:
+                return redirect('admin_dashboard')
+
         except Exception as e:
-            messages.error(request, f'Error creating user: {str(e)}')
-    
+            error_msg = f"Error creating user: {str(e)}"
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': error_msg}, status=400)
+            messages.error(request, error_msg)
+
     context = {
-        'roles': User.ROLE_CHOICES,
+        'roles': [r for r in User.ROLE_CHOICES if r[0] != 'admin'],
         'genders': User.GENDER_CHOICES,
     }
     return render(request, 'accounts/user_form.html', context)
+
+
 
 
 @login_required
@@ -224,7 +328,8 @@ def teacher_list(request):
         'emp_type': emp_type,
         'search': search,
     }
-    return render(request, 'accounts/teacher_list.html', context)
+    return render(request, 'pages/admin_dashboard/teachers.html', {'context' : context})
+
 
 
 @login_required
@@ -244,12 +349,10 @@ def teacher_create(request):
                 notes=request.POST.get('notes'),
             )
             
-            # Add subjects
             subject_ids = request.POST.getlist('subjects')
             if subject_ids:
                 teacher.subjects.set(subject_ids)
             
-            # Set class teacher of
             class_id = request.POST.get('class_teacher_of')
             if class_id:
                 teacher.class_teacher_of_id = class_id
@@ -261,7 +364,6 @@ def teacher_create(request):
         except Exception as e:
             messages.error(request, f'Error creating teacher profile: {str(e)}')
     
-    # Get users with teacher role who don't have a profile
     available_teachers = User.objects.filter(
         role='teacher'
     ).exclude(
@@ -582,7 +684,8 @@ def admin_dashboard(request):
         'teacher_employment': list(teacher_employment),
         'current_term': current_term,
     }
-    return render(request, 'accounts/admin_dashboard.html', context)
+
+    return render(request, 'accounts/admin_dashboard.html', {'context': context})
 
 
 @login_required
