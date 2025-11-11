@@ -1,0 +1,242 @@
+{% extends "base/admin_d.html" %}
+
+{% load static %}
+
+{% block title %}
+    Classes
+{% endblock title %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'styles/pages/classes.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+    <main class="main-content">
+        <div class="page-header">
+            <div class="header-top">
+                <div class="page-title">
+                    <span class="icon"><i class="bi bi-building"></i></span>
+                    <div>
+                        <h1>Classes</h1>
+                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 4px;">Manage all class levels</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="openClassModal">
+                        <i class="bi bi-plus-lg"></i> Add Class
+                    </button>
+                </div>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-box">
+                    <div class="stat-value">{{ context.total_classes|default:0 }}</div>
+                    <div class="stat-label">Total Classes</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ context.active_classes|default:0 }}</div>
+                    <div class="stat-label">Active Classes</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ context.total_students|default:0 }}</div>
+                    <div class="stat-label">Total Students</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ context.total_capacity|default:0 }}</div>
+                    <div class="stat-label">Total Capacity</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="filters-bar">
+            <form method="get">
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label><i class="bi bi-search"></i> Search</label>
+                        <input type="text" name="search" class="form-control" placeholder="Search by name or code..." value="{{ context.search|default:'' }}">
+                    </div>
+                    <div class="filter-group">
+                        <label><i class="bi bi-bar-chart-line"></i> Status</label>
+                        <select name="is_active" class="form-control">
+                            <option value="">All Status</option>
+                            <option value="true" {% if context.is_active == 'true' %}selected{% endif %}>Active</option>
+                            <option value="false" {% if context.is_active == 'false' %}selected{% endif %}>Inactive</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">
+                            <i class="bi bi-funnel"></i> Filter
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="classes-grid">
+            {% for class in context.page_obj %}
+            <div class="class-card">
+                <div class="class-header">
+                    <div class="class-icon" style="background: var(--primary);">
+                        <i class="bi bi-building"></i>
+                    </div>
+                    <div class="class-name">{{ class.name }}</div>
+                    <div class="class-code">{{ class.code|default:"No code" }}</div>
+                </div>
+                <div class="class-body">
+                    <div class="info-row">
+                        <div class="info-icon" style="background: #d1fae5; color: var(--secondary);">
+                            <i class="bi bi-people"></i>
+                        </div>
+                        <div class="info-content">
+                            <div class="info-label">Students</div>
+                            <div class="info-value">{{ class.current_students_count }} / {{ class.capacity }}</div>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-icon" style="background: #dbeafe; color: var(--primary);">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        <div class="info-content">
+                            <div class="info-label">Form Teacher</div>
+                            <div class="info-value">{{ class.form_teacher.get_full_name|default:"Not assigned" }}</div>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-icon" style="background: #ede9fe; color: var(--purple);">
+                            <i class="bi bi-journal-text"></i>
+                        </div>
+                        <div class="info-content">
+                            <div class="info-label">Subjects</div>
+                            <div class="info-value">{{ class.subjects.count }} Subjects</div>
+                        </div>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-info">
+                            <span>Capacity</span>
+                            <span>{{ class.current_students_count }} / {{ class.capacity }}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {% widthratio class.current_students_count class.capacity 100 %}%;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="class-footer">
+                    <button class="btn btn-secondary btn-sm view-btn" data-class-id="{{ class.id }}">
+                        <i class="bi bi-eye"></i> View
+                    </button>
+                    <button class="btn btn-primary btn-sm edit-btn" data-class-id="{{ class.id }}">
+                        <i class="bi bi-pencil-square"></i> Edit
+                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-actions btn-sm dropdown-toggle" type="button">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <div class="dropdown-menu">
+                            <button class="dropdown-item assign-teacher-btn" data-class-id="{{ class.id }}">
+                                <i class="bi bi-person-plus"></i> Assign Teacher
+                            </button>
+                            <button class="dropdown-item manage-subjects-btn" data-class-id="{{ class.id }}">
+                                <i class="bi bi-journal-plus"></i> Manage Subjects
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item delete-btn text-danger" data-class-id="{{ class.id }}">
+                                <i class="bi bi-trash"></i> Delete Class
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="no-classes">
+                <i class="bi bi-building-x" style="font-size: 3rem; color: var(--text-secondary);"></i>
+                <h3>No classes found</h3>
+                <p>No classes match your current filters.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if context.page_obj.paginator.num_pages > 1 %}
+        <div class="pagination">
+            {% if context.page_obj.has_previous %}
+                <a href="?page=1{% if context.search %}&search={{ context.search }}{% endif %}{% if context.is_active %}&is_active={{ context.is_active }}{% endif %}" class="page-btn">
+                    <i class="bi bi-arrow-left"></i> First
+                </a>
+                <a href="?page={{ context.page_obj.previous_page_number }}{% if context.search %}&search={{ context.search }}{% endif %}{% if context.is_active %}&is_active={{ context.is_active }}{% endif %}" class="page-btn">
+                    <i class="bi bi-arrow-left"></i> Previous
+                </a>
+            {% else %}
+                <span class="page-btn disabled"><i class="bi bi-arrow-left"></i> First</span>
+                <span class="page-btn disabled"><i class="bi bi-arrow-left"></i> Previous</span>
+            {% endif %}
+
+            {% for num in context.page_obj.paginator.page_range %}
+                {% if context.page_obj.number == num %}
+                    <span class="page-btn active">{{ num }}</span>
+                {% else %}
+                    <a href="?page={{ num }}{% if context.search %}&search={{ context.search }}{% endif %}{% if context.is_active %}&is_active={{ context.is_active }}{% endif %}" class="page-btn">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if context.page_obj.has_next %}
+                <a href="?page={{ context.page_obj.next_page_number }}{% if context.search %}&search={{ context.search }}{% endif %}{% if context.is_active %}&is_active={{ context.is_active }}{% endif %}" class="page-btn">
+                    Next <i class="bi bi-arrow-right"></i>
+                </a>
+                <a href="?page={{ context.page_obj.paginator.num_pages }}{% if context.search %}&search={{ context.search }}{% endif %}{% if context.is_active %}&is_active={{ context.is_active }}{% endif %}" class="page-btn">
+                    Last <i class="bi bi-arrow-right"></i>
+                </a>
+            {% else %}
+                <span class="page-btn disabled">Next <i class="bi bi-arrow-right"></i></span>
+                <span class="page-btn disabled">Last <i class="bi bi-arrow-right"></i></span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </main>
+
+    <!-- Add Class Modal -->
+    <div id="classModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>➕ Add New Class</h2>
+                <button class="modal-close closeModal">✕</button>
+            </div>
+            <form id="classForm" data-url="{% url 'class_create' %}" data-csrf="{{ csrf_token }}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label>Class Name *</label>
+                    <input type="text" name="name" class="form-control" placeholder="e.g., JHS 1A" required>
+                </div>
+                <div class="form-group">
+                    <label>Class Code</label>
+                    <input type="text" name="code" class="form-control" placeholder="e.g., JHS1A">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" class="form-control" placeholder="Enter class description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Capacity</label>
+                    <input type="number" name="capacity" class="form-control" value="30" min="1" max="100">
+                </div>
+                <div class="form-group">
+                    <label>Display Order</label>
+                    <input type="number" name="display_order" class="form-control" value="0">
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="is_active" checked>
+                        <span>Active Class</span>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary closeModal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Class</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock content %}
+
+{% block js %}
+    <script type="module" src="{% static 'scripts/JS/classes.js' %}"></script>
+{% endblock js %}

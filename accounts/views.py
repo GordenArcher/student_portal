@@ -11,9 +11,9 @@ from academics.models import Subject, ClassLevel, Term, Result
 from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
-from .utils.generateID import generate_teacher_id
+from .utils.generateID import generate_teacher_id, generate_student_id
 from django.core.exceptions import PermissionDenied
-from django.db.models import Case, When, Value, FloatField, IntegerField, F, Q, Count, Sum, Avg
+from django.db.models import Case, When, Q, Count, Avg
 from django.db import models
 
 
@@ -694,20 +694,19 @@ def teacher_update(request, teacher_id):
 
 @login_required
 def student_list(request):
-    """List all students"""
+    """List all students with filtering and pagination"""
     students = StudentProfile.objects.select_related('user', 'current_class')
     
-    # Filter by class
     class_id = request.GET.get('class')
     if class_id:
         students = students.filter(current_class_id=class_id)
     
-    # Filter by active status
-    is_active = request.GET.get('is_active')
-    if is_active:
-        students = students.filter(is_active=is_active == 'true')
+    status = request.GET.get('status')
+    if status == 'active':
+        students = students.filter(is_active=True)
+    elif status == 'inactive':
+        students = students.filter(is_active=False)
     
-    # Search
     search = request.GET.get('search')
     if search:
         students = students.filter(
@@ -716,7 +715,15 @@ def student_list(request):
             Q(student_id__icontains=search)
         )
     
-    # Pagination
+    total_students = students.count()
+    active_students = students.filter(is_active=True).count()
+    inactive_students = students.filter(is_active=False).count()
+    
+    class_counts = ClassLevel.objects.annotate(
+        student_count=Count('students')
+    ).values('name', 'student_count')
+    
+
     paginator = Paginator(students, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -725,51 +732,112 @@ def student_list(request):
         'page_obj': page_obj,
         'classes': ClassLevel.objects.all(),
         'class_id': class_id,
-        'is_active': is_active,
+        'status': status,
         'search': search,
+        'total_students': total_students,
+        'active_students': active_students,
+        'inactive_students': inactive_students,
+        'class_counts': list(class_counts),
     }
-    return render(request, 'accounts/student_list.html', context)
+    return render(request, 'pages/admin_dashboard/students.html', {'context': context})
+
 
 
 @login_required
-@require_http_methods(["GET", "POST"])
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+@transaction.atomic
 def student_create(request):
-    """Create student profile"""
-    if request.method == 'POST':
-        try:
-            user_id = request.POST.get('user_id')
-            user = get_object_or_404(User, id=user_id, role='student')
-            
-            student = StudentProfile.objects.create(
-                user=user,
-                student_id=request.POST.get('student_id'),
-                current_class_id=request.POST.get('current_class') or None,
-                parent_full_name=request.POST.get('parent_full_name'),
-                parent_phone=request.POST.get('parent_phone'),
-                parent_email=request.POST.get('parent_email'),
-                parent_address=request.POST.get('parent_address'),
-                emergency_contact_relation=request.POST.get('emergency_contact_relation'),
-                notes=request.POST.get('notes'),
-            )
-            
-            messages.success(request, 'Student profile created successfully!')
-            return redirect('user_detail', user_id=user.id)
-            
-        except Exception as e:
-            messages.error(request, f'Error creating student profile: {str(e)}')
+    """API endpoint for registering students"""
+    try:
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+        
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+        email = data.get("email")
+        phone_number = data.get("phone_number")
+        gender = data.get("gender")
+        password = data.get("password")
+        date_of_birth = data.get("date_of_birth")
+        profile_picture = request.FILES.get("profile_picture")
+        current_class_id = data.get("current_class")
+        parent_full_name = data.get("parent_full_name")
+        parent_phone = data.get("parent_phone")
+        parent_email = data.get("parent_email")
+        parent_address = data.get("parent_address")
+        emergency_contact_relation = data.get("emergency_contact_relation")
+        
+        # Validation
+        if not all([first_name, last_name, email]):
+            return JsonResponse({
+                'success': False, 
+                'error': 'First name, last name, and email are required.'
+            }, status=400)
+        
+        if User.objects.filter(email=email).exists():
+            return JsonResponse({
+                'success': False, 
+                'error': 'A user with this email already exists.'
+            }, status=400)
+        
+ 
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password or "changeme123",
+            first_name=first_name,
+            last_name=last_name,
+            role="student",
+            phone_number=phone_number,
+            gender=gender,
+            date_of_birth=date_of_birth,
+        )
+        
+        if profile_picture:
+            user.profile_picture = profile_picture
+            user.save()
+        
+        student_id = generate_student_id()
+        
+        student_profile = StudentProfile.objects.create(
+            user=user,
+            student_id=student_id,
+            current_class_id=current_class_id,
+            parent_full_name=parent_full_name,
+            parent_phone=parent_phone,
+            parent_email=parent_email,
+            parent_address=parent_address,
+            emergency_contact_relation=emergency_contact_relation,
+        )
+        
+        response_data = {
+            'success': True,
+            'message': f'Student {user.get_full_name()} registered successfully with ID {student_id}.',
+            'student': {
+                'id': str(user.id),
+                'student_id': student_id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'phone_number': user.phone_number,
+                'current_class': current_class_id,
+            }
+        }
+        
+        if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            messages.success(request, response_data['message'])
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False, 
+            'error': f'An error occurred while registering student: {str(e)}'
+        }, status=500)
     
-    # Get users with student role who don't have a profile
-    available_students = User.objects.filter(
-        role='student'
-    ).exclude(
-        student_profile__isnull=False
-    )
-    
-    context = {
-        'available_students': available_students,
-        'classes': ClassLevel.objects.all(),
-    }
-    return render(request, 'accounts/student_form.html', context)
 
 
 @login_required

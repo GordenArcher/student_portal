@@ -18,7 +18,6 @@ urlpatterns = [
     path('teachers/<int:teacher_id>/update/', views.teacher_update, name='teacher_update'),
     
     # Student Profiles
-    path('students/', views.student_list, name='student_list'),
     path('students/create/', views.student_create, name='student_create'),
     path('students/<int:student_id>/update/', views.student_update, name='student_update'),
     
@@ -33,6 +32,7 @@ urlpatterns = [
         #Admin
     path('dashboard/admin/', views.admin_dashboard, name='admin_dashboard'),
     path('dashboard/admin/teachers/', views.teacher_list, name='teachers_list'),
+    path('dashboard/admin/students/', views.student_list, name='student_list'),
 
         #Teacher
     path('dashboard/teacher/', views.teacher_dashboard, name='teacher_dashboard'),
