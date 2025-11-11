@@ -14,7 +14,7 @@ urlpatterns = [
     path('users/<uuid:user_id>/delete/', views.user_delete, name='user_delete'),
     
     # Teacher Profiles
-    path('teachers/create/', views.teacher_create, name='teacher_create'),
+    path('teachers/create/', views.register_teacher, name='teacher_create'),
     path('teachers/<int:teacher_id>/update/', views.teacher_update, name='teacher_update'),
     
     # Student Profiles
@@ -39,4 +39,10 @@ urlpatterns = [
 
         #Student
     path('dashboard/student/', views.student_dashboard, name='student_dashboard'),
+    
+    # User actions
+    path('users/<uuid:user_id>/reset-password/', views.reset_password, name='reset_password'),
+    path('users/<uuid:user_id>/toggle-status/', views.toggle_user_status, name='toggle_user_status'),
+    path('users/<uuid:user_id>/data/', views.get_user_data, name='get_user_data'),
+    path('users/<uuid:user_id>/change-password/', views.change_password, name='change_password'),
 ]

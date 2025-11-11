@@ -4,7 +4,6 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.db.models import Q, Count, Avg
 from django.core.paginator import Paginator
 import json
 from .models import User, TeacherProfile, StudentProfile, StaffProfile
@@ -14,6 +13,10 @@ from datetime import timedelta
 from django.db import transaction
 from .utils.generateID import generate_teacher_id
 from django.core.exceptions import PermissionDenied
+from django.db.models import Case, When, Value, FloatField, IntegerField, F, Q, Count, Sum, Avg
+from django.db import models
+
+
 
 
 # ============ Authentication Views ============
@@ -59,43 +62,61 @@ def is_admin(user):
 
 @login_required
 @user_passes_test(is_admin)
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["POST"])
 @transaction.atomic
-def register_teacher_view(request):
-    """Allow only admins to register teachers"""
-    if request.method == "POST":
-        first_name = request.POST.get("first_name")
-        last_name = request.POST.get("last_name")
-        email = request.POST.get("email")
-        phone_number = request.POST.get("phone_number")
-        gender = request.POST.get("gender")
-        password = request.POST.get("password")
-        employment_type = request.POST.get("employment_type", "full_time")
-        is_class_teacher = request.POST.get("is_class_teacher") == "on"
-        class_teacher_of_id = request.POST.get("class_teacher_of")
-        subject_ids = request.POST.getlist("subjects")
+def register_teacher(request):
+    """API endpoint for registering teachers"""
+    try:
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
 
-        # Validate email uniqueness
+        print(data)
+        
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+        email = data.get("email")
+        phone_number = data.get("phone_number")
+        gender = data.get("gender")
+        password = data.get("password")
+        date_of_birth = data.get("date_of_birth")
+        profile_picture = request.FILES.get("profile_picture")
+        employment_type = data.get("employment_type", "full_time")
+        is_class_teacher = data.get("is_class_teacher") == "on" or data.get("is_class_teacher") == "true"
+        class_teacher_of_id = data.get("class_teacher_of")
+        subject_ids = data.getlist("subjects") if hasattr(data, 'getlist') else data.get("subjects", [])
+
+        if not all([first_name, last_name, email]):
+            return JsonResponse({
+                'success': False, 
+                'error': 'First name, last name, and email are required.'
+            }, status=400)
+        
         if User.objects.filter(email=email).exists():
-            messages.error(request, "A user with this email already exists.")
-            return redirect("register_teacher")
-
-        # Create user
+            return JsonResponse({
+                'success': False, 
+                'error': 'A user with this email already exists.'
+            }, status=400)
+        
         user = User.objects.create_user(
             username=email,
             email=email,
-            password=password,
+            password=password or "changeme123",
             first_name=first_name,
             last_name=last_name,
             role="teacher",
             phone_number=phone_number,
             gender=gender,
+            date_of_birth=date_of_birth,
         )
-
-        # Generate unique employee ID
+        
+        if profile_picture:
+            user.profile_picture = profile_picture
+            user.save()
+        
         employee_id = generate_teacher_id()
-
-        # Create teacher profile
+        
         teacher_profile = TeacherProfile.objects.create(
             user=user,
             employee_id=employee_id,
@@ -103,21 +124,31 @@ def register_teacher_view(request):
             is_class_teacher=is_class_teacher,
             class_teacher_of=ClassLevel.objects.filter(id=class_teacher_of_id).first() if class_teacher_of_id else None
         )
-
-        # Add subjects if selected
+        
         if subject_ids:
+            if isinstance(subject_ids, str):
+                import ast
+                subject_ids = ast.literal_eval(subject_ids)
             subjects = Subject.objects.filter(id__in=subject_ids)
             teacher_profile.subjects.set(subjects)
+        
+        response_data = {
+            'success': True,
+            'message': f'Teacher {user.get_full_name()} registered successfully with ID {employee_id}.',
+        }
+        
+        if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            messages.success(request, response_data['message'])
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False, 
+            'error': f'An error occurred while registering teacher: {str(e)}'
+        }, status=400)
 
-        messages.success(request, f"Teacher {user.get_full_name()} registered successfully with ID {employee_id}.")
-        return redirect("teachers_list")
 
-    # GET request – render registration form
-    context = {
-        "subjects": Subject.objects.all(),
-        "classes": ClassLevel.objects.all(),
-    }
-    return render(request, "accounts/register_teacher.html", context)
 
 @login_required
 def user_list(request):
@@ -245,7 +276,6 @@ def user_create(request):
 
 
 
-
 @login_required
 @require_http_methods(["GET", "POST"])
 def user_update(request, user_id):
@@ -296,26 +326,67 @@ def user_delete(request, user_id):
     return redirect('user_list')
 
 
+@login_required
+@require_http_methods(["POST"])
+def change_password(request, user_id):
+    """Change user password"""
+    try:
+        user = get_object_or_404(User, id=user_id)
+        data = json.loads(request.body)
+        
+        new_password = data.get('new_password')
+        confirm_password = data.get('confirm_password')
+        
+        if new_password != confirm_password:
+            return JsonResponse({'success': False, 'error': 'Passwords do not match'}, status=400)
+        
+        if len(new_password) < 8:
+            return JsonResponse({'success': False, 'error': 'Password must be at least 8 characters long'}, status=400)
+        
+        user.set_password(new_password)
+        user.save()
+        
+        messages.success(request, f'Password for {user.get_full_name()} changed successfully!')
+        
+        return JsonResponse({'success': True, 'message': 'Password changed successfully!'})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
 # ============ Teacher Profile Views ============
+
 
 @login_required
 def teacher_list(request):
-    """List all teachers"""
+    """List all teachers with filtering and pagination"""
     teachers = TeacherProfile.objects.select_related('user').prefetch_related('subjects')
     
-    # Filter by employment type
+
     emp_type = request.GET.get('employment_type')
     if emp_type:
         teachers = teachers.filter(employment_type=emp_type)
     
-    # Search
+
+    status = request.GET.get('status')
+    if status == 'active':
+        teachers = teachers.filter(is_active=True)
+    elif status == 'inactive':
+        teachers = teachers.filter(is_active=False)
+    
     search = request.GET.get('search')
     if search:
         teachers = teachers.filter(
             Q(user__first_name__icontains=search) |
             Q(user__last_name__icontains=search) |
-            Q(employee_id__icontains=search)
+            Q(employee_id__icontains=search) |
+            Q(user__email__icontains=search)
         )
+    
+    # Get counts for stats
+    total_teachers = teachers.count()
+    full_time_teachers = teachers.filter(employment_type='full_time').count()
+    part_time_teachers = teachers.filter(employment_type='part_time').count()
+    contract_teachers = teachers.filter(employment_type='contract').count()
     
     # Pagination
     paginator = Paginator(teachers, 20)
@@ -327,56 +398,258 @@ def teacher_list(request):
         'employment_types': TeacherProfile.EMPLOYMENT_TYPE_CHOICES,
         'emp_type': emp_type,
         'search': search,
+        'status': status,
+        'total_teachers': total_teachers,
+        'full_time_teachers': full_time_teachers,
+        'part_time_teachers': part_time_teachers,
+        'contract_teachers': contract_teachers,
     }
-    return render(request, 'pages/admin_dashboard/teachers.html', {'context' : context})
+    return render(request, 'pages/admin_dashboard/teachers.html', {'context': context})
+
+
+@login_required
+def student_list(request):
+    """List all students with filtering and pagination"""
+    students = StudentProfile.objects.select_related('user', 'current_class')
+    
+    # Filter by class
+    class_filter = request.GET.get('class')
+    if class_filter:
+        students = students.filter(current_class_id=class_filter)
+    
+    # Filter by active status
+    status = request.GET.get('status')
+    if status == 'active':
+        students = students.filter(is_active=True)
+    elif status == 'inactive':
+        students = students.filter(is_active=False)
+    
+    # Search
+    search = request.GET.get('search')
+    if search:
+        students = students.filter(
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(student_id__icontains=search) |
+            Q(user__email__icontains=search)
+        )
+    
+    # Get counts and classes for filters
+    total_students = students.count()
+    classes = ClassLevel.objects.all()
+    
+    # Pagination
+    paginator = Paginator(students, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'classes': classes,
+        'class_filter': class_filter,
+        'search': search,
+        'status': status,
+        'total_students': total_students,
+    }
+    return render(request, 'pages/admin_dashboard/students.html', {'context': context})
+
+
+@login_required
+@require_http_methods(["POST"])
+def user_update(request, user_id):
+    """Update an existing user"""
+    try:
+        user = get_object_or_404(User, id=user_id)
+        data = request.POST
+        files = request.FILES
+        
+        # Update basic user fields
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        user.email = data.get('email', user.email)
+        user.phone_number = data.get('phone_number', user.phone_number)
+        user.date_of_birth = data.get('date_of_birth') or user.date_of_birth
+        user.gender = data.get('gender', user.gender)
+        
+        if files.get('profile_picture'):
+            user.profile_picture = files['profile_picture']
+        
+        user.save()
+        
+        # Update profile based on role
+        if user.role == 'teacher' and hasattr(user, 'teacher_profile'):
+            teacher_profile = user.teacher_profile
+            teacher_profile.employment_type = data.get('employment_type', teacher_profile.employment_type)
+            teacher_profile.is_class_teacher = data.get('is_class_teacher') == 'on'
+            teacher_profile.class_teacher_of_id = data.get('class_teacher_of') or None
+            teacher_profile.is_active = data.get('is_active') == 'on'
+            teacher_profile.notes = data.get('notes', teacher_profile.notes)
+            teacher_profile.save()
+            
+            # Update subjects
+            subjects = data.getlist('subjects')
+            if subjects:
+                teacher_profile.subjects.set(subjects)
+            
+        elif user.role == 'student' and hasattr(user, 'student_profile'):
+            student_profile = user.student_profile
+            student_profile.current_class_id = data.get('current_class', student_profile.current_class_id)
+            student_profile.academic_year = data.get('academic_year', student_profile.academic_year)
+            student_profile.parent_full_name = data.get('parent_full_name', student_profile.parent_full_name)
+            student_profile.parent_phone = data.get('parent_phone', student_profile.parent_phone)
+            student_profile.parent_email = data.get('parent_email', student_profile.parent_email)
+            student_profile.parent_address = data.get('parent_address', student_profile.parent_address)
+            student_profile.emergency_contact_relation = data.get('emergency_contact_relation', student_profile.emergency_contact_relation)
+            student_profile.is_active = data.get('is_active') == 'on'
+            student_profile.notes = data.get('notes', student_profile.notes)
+            student_profile.save()
+        
+        messages.success(request, f'User {user.get_full_name()} updated successfully!')
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'message': 'User updated successfully!'})
+        return redirect('teacher_list' if user.role == 'teacher' else 'student_list')
+        
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        messages.error(request, f'Error updating user: {str(e)}')
+        return redirect('teacher_list')
+
+
+@login_required
+@require_http_methods(["DELETE", "POST"])
+def user_delete(request, user_id):
+    """Delete a user"""
+    try:
+        user = get_object_or_404(User, id=user_id)
+        user_name = user.get_full_name()
+        user_role = user.role
+        
+        user.delete()
+        
+        messages.success(request, f'User {user_name} deleted successfully!')
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'message': 'User deleted successfully!'})
+        return redirect('teacher_list' if user_role == 'teacher' else 'student_list')
+        
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        messages.error(request, f'Error deleting user: {str(e)}')
+        return redirect('teacher_list')
 
 
 
 @login_required
-@require_http_methods(["GET", "POST"])
-def teacher_create(request):
-    """Create teacher profile"""
-    if request.method == 'POST':
-        try:
-            user_id = request.POST.get('user_id')
-            user = get_object_or_404(User, id=user_id, role='teacher')
-            
-            teacher = TeacherProfile.objects.create(
-                user=user,
-                employee_id=request.POST.get('employee_id'),
-                employment_type=request.POST.get('employment_type'),
-                is_class_teacher=request.POST.get('is_class_teacher') == 'on',
-                notes=request.POST.get('notes'),
-            )
-            
-            subject_ids = request.POST.getlist('subjects')
-            if subject_ids:
-                teacher.subjects.set(subject_ids)
-            
-            class_id = request.POST.get('class_teacher_of')
-            if class_id:
-                teacher.class_teacher_of_id = class_id
-                teacher.save()
-            
-            messages.success(request, 'Teacher profile created successfully!')
-            return redirect('user_detail', user_id=user.id)
-            
-        except Exception as e:
-            messages.error(request, f'Error creating teacher profile: {str(e)}')
+@require_http_methods(["POST"])
+def reset_password(request, user_id):
+    """Reset user password to default"""
+    try:
+        user = get_object_or_404(User, id=user_id)
+        new_password = 'changeme123'
+        user.set_password(new_password)
+        user.save()
+        
+        messages.success(request, f'Password for {user.get_full_name()} reset to default!')
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': True, 'message': 'Password reset successfully!'})
+        return redirect('teacher_list' if user.role == 'teacher' else 'student_list')
+        
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        messages.error(request, f'Error resetting password: {str(e)}')
+        return redirect('teacher_list')
+
+
+@login_required
+@require_http_methods(["POST"])
+def toggle_user_status(request, user_id):
+    """Toggle user active status"""
+    try:
+        user = get_object_or_404(User, id=user_id)
+        
+        if user.role == 'teacher' and hasattr(user, 'teacher_profile'):
+            profile = user.teacher_profile
+        elif user.role == 'student' and hasattr(user, 'student_profile'):
+            profile = user.student_profile
+        else:
+            raise ValueError("User profile not found")
+        
+        profile.is_active = not profile.is_active
+        profile.save()
+        
+        status = "activated" if profile.is_active else "deactivated"
+        messages.success(request, f'User {user.get_full_name()} {status} successfully!')
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True, 
+                'message': f'User {status} successfully!',
+                'is_active': profile.is_active
+            })
+        return redirect('teacher_list' if user.role == 'teacher' else 'student_list')
+        
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        messages.error(request, f'Error toggling user status: {str(e)}')
+        return redirect('teacher_list')
+
+
+@login_required
+def get_user_data(request, user_id):
+
+    """Get user data for AJAX requests"""
+    try:
+        user = get_object_or_404(User, id=user_id)
+        
+        data = {
+            'id': str(user.id),
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'date_of_birth': user.date_of_birth.isoformat() if user.date_of_birth else None,
+            'gender': user.gender,
+            'role': user.role,
+        }
+        
+        if user.role == 'teacher' and hasattr(user, 'teacher_profile'):
+            teacher_profile = user.teacher_profile
+            data.update({
+                'employee_id': teacher_profile.employee_id,
+                'employment_type': teacher_profile.employment_type,
+                'is_class_teacher': teacher_profile.is_class_teacher,
+                'class_teacher_of': str(teacher_profile.class_teacher_of.id) if teacher_profile.class_teacher_of else None,
+                'is_active': teacher_profile.is_active,
+                'notes': teacher_profile.notes,
+                'subjects': list(teacher_profile.subjects.values_list('id', flat=True)),
+            })
+        
+        elif user.role == 'student' and hasattr(user, 'student_profile'):
+            student_profile = user.student_profile
+            data.update({
+                'student_id': student_profile.student_id,
+                'current_class': str(student_profile.current_class.id) if student_profile.current_class else None,
+                'academic_year': student_profile.academic_year,
+                'parent_full_name': student_profile.parent_full_name,
+                'parent_phone': student_profile.parent_phone,
+                'parent_email': student_profile.parent_email,
+                'parent_address': student_profile.parent_address,
+                'emergency_contact_relation': student_profile.emergency_contact_relation,
+                'is_active': student_profile.is_active,
+                'notes': student_profile.notes,
+            })
+        
+        return JsonResponse({'success': True, 'data': data})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
     
-    available_teachers = User.objects.filter(
-        role='teacher'
-    ).exclude(
-        teacher_profile__isnull=False
-    )
-    
-    context = {
-        'available_teachers': available_teachers,
-        'subjects': Subject.objects.all(),
-        'classes': ClassLevel.objects.all(),
-        'employment_types': TeacherProfile.EMPLOYMENT_TYPE_CHOICES,
-    }
-    return render(request, 'accounts/teacher_form.html', context)
 
 
 @login_required
@@ -629,44 +902,121 @@ def user_api_detail(request, user_id):
 @login_required
 def admin_dashboard(request):
     """Admin dashboard with comprehensive statistics and analytics"""
-    # Basic counts
+    
     total_users = User.objects.count()
     total_teachers = User.objects.filter(role='teacher').count()
     total_students = User.objects.filter(role='student').count()
     total_staff = User.objects.filter(role='admin').count()
     
-    # Active profiles
     active_students = StudentProfile.objects.filter(is_active=True).count()
     active_teachers = TeacherProfile.objects.filter(is_active=True).count()
     
-    # Academic data
     total_subjects = Subject.objects.filter(is_active=True).count()
     total_classes = ClassLevel.objects.filter(is_active=True).count()
     
-    # Recent results data
     current_term = Term.objects.filter(is_current=True).first()
     recent_results = Result.objects.filter(date_uploaded__gte=timezone.now()-timedelta(days=30)).count()
     
-    # Performance data
     avg_score = Result.objects.aggregate(avg_score=Avg('score'))['avg_score'] or 0
     
-    # Recent activity
     recent_students = StudentProfile.objects.filter(
         created_at__gte=timezone.now()-timedelta(days=30)
     ).count()
     
-    # Class distribution
     class_distribution = ClassLevel.objects.filter(is_active=True).annotate(
         student_count=Count('students')
-    ).values('name', 'student_count')
+    ).values('name', 'student_count').order_by('-student_count')
     
-    # Teacher distribution by employment type
     teacher_employment = TeacherProfile.objects.values('employment_type').annotate(
         count=Count('id')
     )
+
+    top_students = []
+    if current_term:
+        top_students = Result.objects.filter(
+            term=current_term
+        ).values(
+            'student__id',
+            'student__first_name',
+            'student__last_name',
+            'student__student_profile__student_id',
+            'student__student_profile__current_class__name'
+        ).annotate(
+            avg_score=Avg('score')
+        ).order_by('-avg_score')[:5]
+    
+    subject_stats = Subject.objects.filter(
+        results__isnull=False
+    ).annotate(
+        student_count=Count('results__student', distinct=True),
+        avg_score=Avg('results__score'),
+        pass_rate=Avg(
+            Case(
+                When(results__score__gte=50, then=1),
+                default=0,
+                output_field=models.FloatField()
+            )
+        ) * 100
+    ).values('name', 'student_count', 'avg_score', 'pass_rate').order_by('-avg_score')[:4]
+    
+    # Teacher workload (based on assigned subjects)
+    teacher_workload = TeacherProfile.objects.annotate(
+        subject_count=Count('subjects', distinct=True),
+        class_count=Count('subjects__class_levels', distinct=True)
+    ).values(
+        'user__first_name',
+        'user__last_name',
+        'subject_count',
+        'class_count'
+    ).order_by('-subject_count')[:4]
+    
+    recent_activities = [
+        {
+            'type': 'result_upload',
+            'title': 'Results uploaded',
+            'details': 'Mathematics - JHS 2',
+            'time': '2h ago',
+            'icon': '📝',
+            'color': '#dbeafe'
+        },
+        {
+            'type': 'student_enrollment',
+            'title': 'New student enrolled',
+            'details': 'Akua Mensah - JHS 1A',
+            'time': '4h ago',
+            'icon': '✅',
+            'color': '#d1fae5'
+        },
+        {
+            'type': 'teacher_assignment',
+            'title': 'Teacher assigned',
+            'details': 'Mr. Owusu to Science',
+            'time': '6h ago',
+            'icon': '👨‍🏫',
+            'color': '#ede9fe'
+        },
+        {
+            'type': 'event_scheduled',
+            'title': 'Event scheduled',
+            'details': 'Parent-Teacher Meeting',
+            'time': '1d ago',
+            'icon': '📅',
+            'color': '#fef3c7'
+        },
+        {
+            'type': 'notice_sent',
+            'title': 'Notice sent',
+            'details': 'Exam timetable released',
+            'time': '2d ago',
+            'icon': '📢',
+            'color': '#fee2e2'
+        }
+    ]
+    
+    core_subjects = Subject.objects.filter(category='core', is_active=True).count()
+    elective_subjects = Subject.objects.filter(category='elective', is_active=True).count()
     
     context = {
-        # Basic counts
         'total_users': total_users,
         'total_teachers': total_teachers,
         'total_students': total_students,
@@ -676,16 +1026,23 @@ def admin_dashboard(request):
         'total_subjects': total_subjects,
         'total_classes': total_classes,
         
-        # Analytics
         'recent_results': recent_results,
         'avg_score': round(avg_score, 2),
         'recent_students': recent_students,
         'class_distribution': list(class_distribution),
         'teacher_employment': list(teacher_employment),
         'current_term': current_term,
+        
+        'top_students': list(top_students),
+        'subject_stats': list(subject_stats),
+        'teacher_workload': list(teacher_workload),
+        'recent_activities': recent_activities,
+        'core_subjects': core_subjects,
+        'elective_subjects': elective_subjects,
     }
 
     return render(request, 'accounts/admin_dashboard.html', {'context': context})
+
 
 
 @login_required
@@ -711,3 +1068,23 @@ def student_dashboard(request):
         'class_teacher': student_profile.class_teacher,
     }
     return render(request, 'accounts/student_dashboard.html', context)
+
+
+# @login_required
+# def user_detail(request, user_id):
+#     """Get user details for viewing or editing"""
+#     user = get_object_or_404(User, id=user_id)
+    
+#     context = {
+#         'user': user,
+#     }
+    
+#     if user.role == 'teacher' and hasattr(user, 'teacher_profile'):
+#         context['teacher_profile'] = user.teacher_profile
+#         context['subjects'] = Subject.objects.all()
+#         context['classes'] = ClassLevel.objects.all()
+#     elif user.role == 'student' and hasattr(user, 'student_profile'):
+#         context['student_profile'] = user.student_profile
+#         context['classes'] = ClassLevel.objects.all()
+    
+#     return render(request, 'pages/admin_dashboard/user_detail.html', context)

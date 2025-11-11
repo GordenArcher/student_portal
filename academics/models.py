@@ -205,7 +205,7 @@ class Result(models.Model):
         related_name="results",
         limit_choices_to={'role': 'student'}
     )
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='results' )
     class_level = models.ForeignKey(ClassLevel, on_delete=models.CASCADE)
     term = models.ForeignKey(Term, on_delete=models.CASCADE)
     

@@ -1,15 +1,47 @@
 
-export function showToast(message, type = "success", duration = 3000) {
-    const toast = document.getElementById("toast");
-    if (!toast) return;
+export default function showToast(message, type = "success", duration = 3000) {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toast-container";
+        container.style.position = "fixed";
+        container.style.top = "20px";
+        container.style.right = "20px";
+        container.style.zIndex = 9999;
+        container.style.display = "flex";
+        container.style.flexDirection = "column";
+        container.style.gap = "10px";
+        document.body.appendChild(container);
+    }
 
+    const toast = document.createElement("div");
     toast.textContent = message;
-    toast.className = `toast ${type} show bounce`;
+    toast.className = `toast ${type}`;
+    toast.style.background = type === "success" ? "#22c55e" : type === "error" ? "#ef4444" : "#3b82f6";
+    toast.style.color = "#fff";
+    toast.style.padding = "12px 20px";
+    toast.style.borderRadius = "8px";
+    toast.style.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
+    toast.style.opacity = "0";
+    toast.style.transform = "translateX(100%)";
+    toast.style.transition = "all 0.4s ease";
+
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => {
+        toast.style.opacity = "1";
+        toast.style.transform = "translateX(0)";
+    });
 
     setTimeout(() => {
-        toast.className = `toast ${type}`;
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(100%)";
+        toast.addEventListener("transitionend", () => {
+            toast.remove();
+        });
     }, duration);
 }
+
 
 
 document.addEventListener("DOMContentLoaded", function() {
