@@ -43,6 +43,24 @@ export default function showToast(message, type = "success", duration = 3000) {
 }
 
 
+export function showLoader() {
+    const loader = document.createElement('div');
+    loader.className = 'modal show';
+    loader.innerHTML = `
+        <div class="modal-content" style="text-align: center; max-width: 200px;">
+            <div class="loader-spinner"></div>
+            <p>Loading...</p>
+        </div>
+    `;
+    loader.id = 'loader-modal';
+    document.body.appendChild(loader);
+}
+
+export function hideLoader() {
+    const loader = document.getElementById('loader-modal');
+    if (loader) loader.remove();
+}
+
 
 document.addEventListener("DOMContentLoaded", function() {
     const navLinks = document.querySelectorAll(".nav-links li a");

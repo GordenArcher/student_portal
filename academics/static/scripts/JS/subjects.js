@@ -1,4 +1,7 @@
 import showToast from "/static/scripts/JS/admin_d.js"
+import hideLoader from "/static/scripts/JS/admin_d.js"
+import showLoader from "/static/scripts/JS/admin_d.js"
+import getCsrfToken from "/static/scripts/JS/utility/getCsrfToken.js"
 
 document.addEventListener('click', function(e) {
     const dropdownBtn = e.target.closest('.dropdown-toggle');
@@ -88,8 +91,7 @@ async function deleteSubject(subjectId) {
 // Get subject data
 async function getSubjectData(subjectId) {
     try {
-        // This would need a dedicated endpoint
-        const response = await fetch(`/api/subjects/${subjectId}/`, {
+        const response = await fetch(`/academics/subjects/${subjectId}/data/`, {
             method: 'GET',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
@@ -97,7 +99,13 @@ async function getSubjectData(subjectId) {
         });
 
         const data = await response.json();
-        return data;
+
+        if (data.success) {
+            return data.data;
+        } else {
+            showToast(data.error || 'Failed to load subject data', 'error');
+            return null;
+        }
     } catch (error) {
         console.error('Error fetching subject data:', error);
         showToast('An error occurred while loading subject data', 'error');
@@ -287,30 +295,6 @@ async function updateSubject(subjectId, formData) {
         console.error('Error updating subject:', error);
         showToast('An error occurred while updating subject', 'error');
     }
-}
-
-// Utility functions
-function getCsrfToken() {
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-    return csrfToken ? csrfToken.value : '';
-}
-
-function showLoader() {
-    const loader = document.createElement('div');
-    loader.className = 'modal show';
-    loader.innerHTML = `
-        <div class="modal-content" style="text-align: center; max-width: 200px;">
-            <div class="loader-spinner"></div>
-            <p>Loading...</p>
-        </div>
-    `;
-    loader.id = 'loader-modal';
-    document.body.appendChild(loader);
-}
-
-function hideLoader() {
-    const loader = document.getElementById('loader-modal');
-    if (loader) loader.remove();
 }
 
 // Event listeners

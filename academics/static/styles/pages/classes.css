@@ -1,4 +1,4 @@
-/* Classes Grid */
+
 .classes-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -108,4 +108,186 @@
 .no-classes h3 {
     margin: 16px 0 8px;
     color: var(--text-primary);
+}
+
+.class-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-main);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.class-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.class-details {
+    flex: 1;
+}
+
+.class-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.class-code {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* Subjects selection */
+.subjects-selection {
+    margin: 12px 0;
+}
+
+.subject-checkbox:hover {
+    background: var(--bg-main) !important;
+}
+
+.subject-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.subjects-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.subject-tag {
+    padding: 4px 10px;
+    background: #dbeafe;
+    color: var(--primary);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Current teacher/subject info */
+.current-teacher, .current-subjects {
+    border: 1px solid var(--border);
+}
+
+
+.subjects-management {
+    margin-top: 20px;
+}
+
+.subjects-list-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: white;
+}
+
+.subject-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.subject-item:last-child {
+    border-bottom: none;
+}
+
+.subject-item:hover {
+    background: var(--bg-main);
+}
+
+.subject-item.selected {
+    background: #dbeafe;
+}
+
+.subject-check {
+    flex-shrink: 0;
+}
+
+.subject-check input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.subject-info {
+    flex: 1;
+}
+
+.subject-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.subject-code {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.subject-category {
+    flex-shrink: 0;
+}
+
+.category-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.category-badge.core {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.category-badge.elective {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.selection-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--bg-main);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.summary-item {
+    text-align: center;
+}
+
+.summary-item span:first-child {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.summary-item span:last-child {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary);
 }

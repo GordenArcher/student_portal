@@ -177,7 +177,7 @@ class StudentProfile(models.Model):
             models.Index(fields=['current_class']),
             models.Index(fields=['academic_year']),
         ]
-        unique_together = ['current_class']
+        unique_together = ['student_id']
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.student_id}"
@@ -194,15 +194,7 @@ class StudentProfile(models.Model):
         """Calculate student's age."""
         return self.user.age
     
-    def save(self, *args, **kwargs):
-        """Auto-generate roll number if not provided and class is set."""
-        if self.current_class and not self.roll_number:
-            last_student = StudentProfile.objects.filter(
-                current_class=self.current_class
-            ).order_by('-roll_number').first()
-            self.roll_number = (last_student.roll_number + 1) if last_student and last_student.roll_number else 1
-        super().save(*args, **kwargs)
-
+    
 
 class StaffProfile(models.Model):
     """

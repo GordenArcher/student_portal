@@ -8,8 +8,9 @@ from django.db import transaction
 from django.db.models import Q
 from django.core.paginator import Paginator
 import json
-
+from accounts.models import User
 from .models import Subject, ClassLevel, AcademicYear, Term
+import ast
 
 @login_required
 def subject_list(request):
@@ -408,4 +409,164 @@ def class_delete(request, class_id):
         return JsonResponse({
             'success': False, 
             'error': f'An error occurred while deleting class: {str(e)}'
+        }, status=400)
+
+
+
+@login_required
+@require_http_methods(["GET"])
+def get_subject_data(request, subject_id):
+    """Get subject data for AJAX requests"""
+    try:
+        subject = get_object_or_404(Subject, id=subject_id)
+        
+        data = {
+            'id': str(subject.id),
+            'name': subject.name,
+            'code': subject.code,
+            'description': subject.description,
+            'category': subject.category,
+            'is_active': subject.is_active,
+            'teacher': str(subject.teacher.id) if subject.teacher else None,
+            'teacher_name': subject.teacher.get_full_name() if subject.teacher else None,
+            'created_at': subject.created_at.isoformat(),
+            'updated_at': subject.updated_at.isoformat(),
+        }
+        
+        return JsonResponse({'success': True, 'data': data})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+@login_required
+@require_http_methods(["GET"])
+def get_class_data(request, class_id):
+    """Get class data for AJAX requests"""
+    try:
+        class_level = get_object_or_404(ClassLevel, id=class_id)
+        
+        data = {
+            'id': str(class_level.id),
+            'name': class_level.name,
+            'code': class_level.code,
+            'description': class_level.description,
+            'capacity': class_level.capacity,
+            'display_order': class_level.display_order,
+            'is_active': class_level.is_active,
+            'form_teacher': str(class_level.form_teacher.id) if class_level.form_teacher else None,
+            'form_teacher_name': class_level.form_teacher.get_full_name() if class_level.form_teacher else None,
+            'current_students_count': class_level.current_students_count,
+            'available_seats': class_level.available_seats,
+            'subjects': list(class_level.subjects.values('id', 'name', 'code')),
+            'created_at': class_level.created_at.isoformat(),
+            'updated_at': class_level.updated_at.isoformat(),
+        }
+        
+        return JsonResponse({'success': True, 'data': data})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required
+@require_http_methods(["GET"])
+def get_teachers_list(request):
+    """Get list of teachers for dropdowns"""
+    try:
+        teachers = User.objects.filter(
+            role='teacher',
+            teacher_profile__is_active=True
+        ).select_related('teacher_profile').values(
+            'id', 'first_name', 'last_name', 'email', 'teacher_profile__employee_id'
+        )
+        
+        teachers_list = list(teachers)
+        return JsonResponse({'success': True, 'teachers': teachers_list})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required
+@require_http_methods(["GET"])
+def get_subjects_list(request):
+    """Get list of subjects for dropdowns"""
+    try:
+        subjects = Subject.objects.filter(is_active=True).values('id', 'name', 'code')
+        subjects_list = list(subjects)
+        return JsonResponse({'success': True, 'subjects': subjects_list})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+@transaction.atomic
+def assign_subjects_to_class(request, class_id):
+    """API endpoint for assigning subjects to a class"""
+    try:
+        class_level = get_object_or_404(ClassLevel, id=class_id)
+        
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+        
+        subject_ids = data.getlist("subjects") if hasattr(data, 'getlist') else data.get("subjects", [])
+        
+        if isinstance(subject_ids, str):
+            subject_ids = ast.literal_eval(subject_ids)
+        
+        subjects = Subject.objects.filter(id__in=subject_ids)
+        
+        class_level.subjects.set(subjects)
+        
+        response_data = {
+            'success': True,
+            'message': f'Successfully updated subjects for {class_level.name}.',
+            'subjects_count': subjects.count()
+        }
+        
+        return JsonResponse(response_data)
+        
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False, 
+            'error': f'An error occurred while updating class subjects: {str(e)}'
+        }, status=400)
+
+
+@login_required
+@require_http_methods(["POST"])
+@transaction.atomic
+def assign_teacher_to_class(request, class_id):
+    """API endpoint for assigning teacher to a class"""
+    try:
+        class_level = get_object_or_404(ClassLevel, id=class_id)
+        
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+        
+        teacher_id = data.get("form_teacher")
+        
+        class_level.form_teacher_id = teacher_id if teacher_id else None
+        class_level.save()
+        
+        teacher_name = class_level.form_teacher.get_full_name() if class_level.form_teacher else "No teacher"
+        
+        response_data = {
+            'success': True,
+            'message': f'Successfully assigned {teacher_name} to {class_level.name}.',
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False, 
+            'error': f'An error occurred while assigning teacher: {str(e)}'
         }, status=400)

@@ -12,6 +12,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
 from .utils.generateID import generate_teacher_id, generate_student_id
+from core.views import get_recent_activities
 from django.core.exceptions import PermissionDenied
 from django.db.models import Case, When, Q, Count, Avg
 from django.db import models
@@ -771,7 +772,7 @@ def student_create(request):
         emergency_contact_relation = data.get("emergency_contact_relation")
         
         # Validation
-        if not all([first_name, last_name, email]):
+        if not all([first_name, last_name]):
             return JsonResponse({
                 'success': False, 
                 'error': 'First name, last name, and email are required.'
@@ -783,9 +784,19 @@ def student_create(request):
                 'error': 'A user with this email already exists.'
             }, status=400)
         
+
+        student_id = generate_student_id()
+
+        if User.objects.filter(username=student_id).exists():
+            return JsonResponse({
+                'success': False, 
+                'error': 'A user with this username already exists.'
+            }, status=400)
+        
+        
  
         user = User.objects.create_user(
-            username=email,
+            username=student_id,
             email=email,
             password=password or "changeme123",
             first_name=first_name,
@@ -800,8 +811,7 @@ def student_create(request):
             user.profile_picture = profile_picture
             user.save()
         
-        student_id = generate_student_id()
-        
+
         student_profile = StudentProfile.objects.create(
             user=user,
             student_id=student_id,
@@ -816,15 +826,6 @@ def student_create(request):
         response_data = {
             'success': True,
             'message': f'Student {user.get_full_name()} registered successfully with ID {student_id}.',
-            'student': {
-                'id': str(user.id),
-                'student_id': student_id,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'email': user.email,
-                'phone_number': user.phone_number,
-                'current_class': current_class_id,
-            }
         }
         
         if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -1037,50 +1038,9 @@ def admin_dashboard(request):
         'subject_count',
         'class_count'
     ).order_by('-subject_count')[:4]
-    
-    recent_activities = [
-        {
-            'type': 'result_upload',
-            'title': 'Results uploaded',
-            'details': 'Mathematics - JHS 2',
-            'time': '2h ago',
-            'icon': '📝',
-            'color': '#dbeafe'
-        },
-        {
-            'type': 'student_enrollment',
-            'title': 'New student enrolled',
-            'details': 'Akua Mensah - JHS 1A',
-            'time': '4h ago',
-            'icon': '✅',
-            'color': '#d1fae5'
-        },
-        {
-            'type': 'teacher_assignment',
-            'title': 'Teacher assigned',
-            'details': 'Mr. Owusu to Science',
-            'time': '6h ago',
-            'icon': '👨‍🏫',
-            'color': '#ede9fe'
-        },
-        {
-            'type': 'event_scheduled',
-            'title': 'Event scheduled',
-            'details': 'Parent-Teacher Meeting',
-            'time': '1d ago',
-            'icon': '📅',
-            'color': '#fef3c7'
-        },
-        {
-            'type': 'notice_sent',
-            'title': 'Notice sent',
-            'details': 'Exam timetable released',
-            'time': '2d ago',
-            'icon': '📢',
-            'color': '#fee2e2'
-        }
-    ]
-    
+
+    recent_activities = get_recent_activities()
+
     core_subjects = Subject.objects.filter(category='core', is_active=True).count()
     elective_subjects = Subject.objects.filter(category='elective', is_active=True).count()
     
