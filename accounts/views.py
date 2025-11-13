@@ -1096,23 +1096,3 @@ def student_dashboard(request):
         'class_teacher': student_profile.class_teacher,
     }
     return render(request, 'accounts/student_dashboard.html', context)
-
-
-# @login_required
-# def user_detail(request, user_id):
-#     """Get user details for viewing or editing"""
-#     user = get_object_or_404(User, id=user_id)
-    
-#     context = {
-#         'user': user,
-#     }
-    
-#     if user.role == 'teacher' and hasattr(user, 'teacher_profile'):
-#         context['teacher_profile'] = user.teacher_profile
-#         context['subjects'] = Subject.objects.all()
-#         context['classes'] = ClassLevel.objects.all()
-#     elif user.role == 'student' and hasattr(user, 'student_profile'):
-#         context['student_profile'] = user.student_profile
-#         context['classes'] = ClassLevel.objects.all()
-    
-#     return render(request, 'pages/admin_dashboard/user_detail.html', context)
