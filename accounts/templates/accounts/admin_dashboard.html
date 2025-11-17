@@ -12,6 +12,7 @@
 
 {% block extra_head %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script> -->
     <style>
         .empty-state {
             text-align: center;
@@ -177,22 +178,22 @@
         </div>
 
         <div class="quick-actions-grid">
-            <div class="action-card">
+            <a class="action-card">
                 <div class="action-icon">➕</div>
                 <div class="action-label">Add Student</div>
-            </div>
-            <div class="action-card">
+            </a>
+            <a class="action-card">
                 <div class="action-icon">👨‍🏫</div>
                 <div class="action-label">Add Teacher</div>
-            </div>
+            </a>
             <div class="action-card">
                 <div class="action-icon">📝</div>
                 <div class="action-label">Upload Results</div>
             </div>
-            <div class="action-card">
+            <a href="{% url 'create_academic_year' %}" class="action-card">
                 <div class="action-icon">📊</div>
-                <div class="action-label">Generate Report</div>
-            </div>
+                <div class="action-label">Add year</div>
+            </a>
             <div class="action-card">
                 <div class="action-icon">📅</div>
                 <div class="action-label">Schedule Event</div>
@@ -231,7 +232,9 @@
                     <h3>Class Distribution</h3>
                 </div>
                 <div class="chart-container">
+                    
                     {% if context.class_distribution %}
+                    
                         <canvas id="classChart"></canvas>
                     {% else %}
                         <div class="empty-state">
@@ -343,25 +346,34 @@
                 <div class="table-header">
                     <h3>👨‍🏫 Teacher Workload Distribution</h3>
                 </div>
+                
                 {% if context.teacher_workload %}
                 <div style="margin-top: 16px;">
                     {% for teacher in context.teacher_workload %}
-                    <div class="workload-item">
-                        <div class="workload-header">
-                            <span class="workload-name">{{ teacher.user__first_name }} {{ teacher.user__last_name }}</span>
-                            <span class="workload-count">{{ teacher.subject_count }} subjects</span>
+                        <div class="workload-item" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                            <div class="workload-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span class="workload-name" style="font-weight: 600; color: #1e293b;">
+                                    {{ teacher.first_name }} {{ teacher.last_name }}
+                                </span>
+                                <span class="workload-count" style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                    {{ teacher.total_assignments }} assignment{{ teacher.total_assignments|pluralize }}
+                                </span>
+                            </div>
+                            <div class="progress-bar" style="width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-bottom: 8px;">
+                                <div class="progress-fill" style="width: {% widthratio teacher.total_assignments 10 100 %}%; height: 100%; background: #3b82f6; border-radius: 3px;"></div>
+                            </div>
+                            <div class="workload-details" style="font-size: 0.875rem; color: #64748b;">
+                                {{ teacher.total_subjects }} subject{{ teacher.total_subjects|pluralize }}, 
+                                {{ teacher.total_classes }} class{{ teacher.total_classes|pluralize }}
+                            </div>
                         </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: {% widthratio teacher.subject_count 10 100 %}%; background: var(--primary);"></div>
-                        </div>
-                    </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                <div class="empty-state">
-                    <i class="bi bi-person-badge"></i>
-                    <h4>No Teachers</h4>
-                    <p>Add teachers to see workload distribution</p>
+                <div class="empty-state" style="text-align: center; padding: 40px 20px; color: #64748b;">
+                    <i class="bi bi-person-badge" style="font-size: 3rem; margin-bottom: 16px; display: block;"></i>
+                    <h4 style="margin: 16px 0 8px; color: #374151;">No Teacher Assignments</h4>
+                    <p>Assign teachers to classes to see workload distribution</p>
                 </div>
                 {% endif %}
             </div>
@@ -409,4 +421,182 @@
 
 {% block js %}
     <script type="module" src="{% static 'scripts/JS/admin_dashboard.js' %}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    {% if context.avg_score > 0 %}
+    const performanceCanvas = document.getElementById('performanceChart');
+    if (performanceCanvas) {
+        const performanceCtx = performanceCanvas.getContext('2d');
+        new Chart(performanceCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
+                datasets: [{
+                    label: 'Average Score',
+                    data: [
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }},
+                        {{ context.avg_score|floatformat:1 }}
+                    ],
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: {
+                            color: '#e2e8f0'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+    {% endif %}
+
+    {% if context.subject_stats %}
+    const subjectCanvas = document.getElementById('subjectChart');
+    if (subjectCanvas) {
+        const subjectCtx = subjectCanvas.getContext('2d');
+        new Chart(subjectCtx, {
+            type: 'bar',
+            data: {
+                labels: [
+                    {% for subject in context.subject_stats %}
+                    '{{ subject.name }}'{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                datasets: [{
+                    label: 'Average Score',
+                    data: [
+                        {% for subject in context.subject_stats %}
+                        {{ subject.avg_score|floatformat:1 }}{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    ],
+                    backgroundColor: '#2563eb',
+                    borderRadius: 6
+                }, {
+                    label: 'Pass Rate (%)',
+                    data: [
+                        {% for subject in context.subject_stats %}
+                        {{ subject.pass_rate|floatformat:1 }}{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    ],
+                    backgroundColor: '#10b981',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: {
+                            color: '#e2e8f0'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+    {% endif %}
+});
+</script>
+
+  // Class Distribution Chart - Using class_distribution from context
+{% if context.class_distribution %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const classCanvas = document.getElementById('classChart');
+    if (classCanvas) {
+        const classCtx = classCanvas.getContext('2d');
+        new Chart(classCtx, {
+            type: 'doughnut',
+            data: {
+                labels: [
+                    {% for class in context.class_distribution %}
+                    '{{ class.name }}'{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ],
+                datasets: [{
+                    data: [
+                        {% for class in context.class_distribution %}
+                        {{ class.student_count }}{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    ],
+                    backgroundColor: ['#2563eb', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                return `${label}: ${value} students`;
+                            }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+});
+</script>
+{% endif %}
 {% endblock js %}

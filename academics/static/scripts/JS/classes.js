@@ -464,10 +464,12 @@ async function manageSubjects(classId) {
         const classData = await getClassData(classId);
         const subjectsResponse = await fetch('/academics/api/subjects/');
         const subjectsData = await subjectsResponse.json();
+        const academicYears = await loadAcademicYears();
         hideLoader();
 
         if (classData && subjectsData.success) {
-            showManageSubjectsModal(classData, subjectsData.subjects);
+            showManageSubjectsModal(classData, subjectsData.subjects, academicYears.academic_years
+);
         }
     } catch (error) {
         hideLoader();
@@ -476,9 +478,28 @@ async function manageSubjects(classId) {
     }
 }
 
+async function loadAcademicYears() {
+    try {
+        const response = await fetch('/academics/academic-years/', {
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error loading academic years:', error);
+        return [];
+    }
+}
+
 // Show manage subjects modal
-function showManageSubjectsModal(classData, allSubjects) {
+function showManageSubjectsModal(classData, allSubjects, academicYears) {
+
     const modal = document.createElement('div');
+    
     modal.className = 'modal show';
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 600px;">
@@ -496,6 +517,31 @@ function showManageSubjectsModal(classData, allSubjects) {
                 </div>
                 
                 <div class="subjects-management">
+                    ${academicYears && academicYears.length > 0 ? `
+                        <div class="form-group">
+                            <label for="academic_year">Academic Year</label>
+                            <select name="academic_year" id="academic_year" class="form-control" required>
+                                <option value="">Select Academic Year</option>
+                                ${academicYears.map(year => `
+                                    <option value="${year.id}" ${year.is_current ? 'selected' : ''}>
+                                        ${year.name} ${year.is_current ? '(Current)' : ''}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                    ` : `
+                        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 12px 16px; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
+                            <i class="bi bi-exclamation-triangle" style="color: #f39c12; font-size: 16px;"></i>
+                            <span>
+                                No academic years available. Please ${" "}
+                                <a href="/academics/academic-years/create/" style="color: #856404; text-decoration: underline; font-weight: 500;">
+                                    create an academic year
+                                </a> 
+                                first.
+                            </span>
+                        </div>
+                    `}
+
                     <div class="form-group">
                         <label>Available Subjects</label>
                         <div class="subjects-selection">
@@ -505,7 +551,7 @@ function showManageSubjectsModal(classData, allSubjects) {
                                     return `
                                         <div class="subject-item ${isSelected ? 'selected' : ''}" data-subject-id="${subject.id}">
                                             <div class="subject-check">
-                                                <input type="checkbox" ${isSelected ? 'checked' : ''}>
+                                                <input name="subjects" type="checkbox" value="${subject.id}" ${isSelected ? 'checked' : ''}>
                                             </div>
                                             <div class="subject-info">
                                                 <div class="subject-name">${subject.name}</div>
@@ -596,7 +642,6 @@ function showManageSubjectsModal(classData, allSubjects) {
         });
     });
     
-    // Save subjects
     modal.querySelector('#saveSubjectsBtn').addEventListener('click', async () => {
         await updateClassSubjects(classData.id);
     });
@@ -606,7 +651,6 @@ function showManageSubjectsModal(classData, allSubjects) {
         if (e.target === modal) modal.remove();
     });
     
-    // Initialize counts
     updateSelectionCounts();
 }
 
@@ -642,15 +686,49 @@ async function updateClassTeacher(classId, formData) {
 // Update class subjects
 async function updateClassSubjects(classId, formData) {
     try {
-        // Get all checked subject IDs
-        const subjectCheckboxes = document.querySelectorAll('input[name="subjects"]:checked');
-        const subjectIds = Array.from(subjectCheckboxes).map(checkbox => checkbox.value);
-
-        console.log('subjectIds ', subjectIds)
-        console.log('subjectCheckboxes ',  subjectCheckboxes)
+        console.log('Starting updateClassSubjects for class:', classId);
         
-        // Create form data with subject IDs
+        // Wait a bit if content was dynamically loaded
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        const academicYearSelect = document.querySelector('select[name="academic_year"]');
+        const academicYearId = academicYearSelect ? academicYearSelect.value : null;
+        
+        if (!academicYearId) {
+            showToast('Please select an academic year', 'error');
+            return;
+        }
+        
+        const subjectCheckboxes = document.querySelectorAll('input[name="subjects"]:checked');
+        console.log('Found checkboxes:', subjectCheckboxes.length);
+        
+        // Debug each checkbox
+        subjectCheckboxes.forEach((checkbox, index) => {
+            console.log(`Checkbox ${index}:`, {
+                value: checkbox.value,
+                id: checkbox.id,
+                dataset: checkbox.dataset
+            });
+        });
+        
+        const subjectIds = Array.from(subjectCheckboxes)
+            .map(checkbox => {
+                // Try different ways to get the ID
+                return checkbox.value || 
+                       checkbox.getAttribute('data-subject-id') || 
+                       checkbox.id.replace('subject_', '');
+            })
+            .filter(id => id && id !== ''); // Remove empty values
+        
+        console.log('Final subjectIds:', subjectIds);
+        
+        if (subjectIds.length === 0) {
+            showToast('Please select at least one subject', 'error');
+            return;
+        }
+        
         const submitData = new FormData();
+        submitData.append("academic_year", academicYearId)
         subjectIds.forEach(id => {
             submitData.append('subjects', id);
         });
@@ -665,12 +743,13 @@ async function updateClassSubjects(classId, formData) {
         });
 
         const data = await response.json();
+        console.log('Server response:', data);
 
         if (data.success) {
             showToast(data.message, 'success');
             document.querySelector('.modal.show')?.remove();
             setTimeout(() => {
-                // window.location.reload();
+                window.location.reload();
             }, 1500);
         } else {
             showToast(data.error || 'Failed to update subjects', 'error');

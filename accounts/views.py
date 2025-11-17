@@ -7,14 +7,14 @@ from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 import json
 from .models import User, TeacherProfile, StudentProfile, StaffProfile
-from academics.models import Subject, ClassLevel, Term, Result
+from academics.models import Subject, ClassLevel, Term, Result, AcademicYear
 from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
 from .utils.generateID import generate_teacher_id, generate_student_id
-from core.views import get_recent_activities
+from core.views import get_recent_activities, get_teacher_workload
 from django.core.exceptions import PermissionDenied
-from django.db.models import Case, When, Q, Count, Avg
+from django.db.models import Case, When, Q, Count, Avg, Max
 from django.db import models
 
 
@@ -1029,15 +1029,11 @@ def admin_dashboard(request):
     ).values('name', 'student_count', 'avg_score', 'pass_rate').order_by('-avg_score')[:4]
     
     # Teacher workload (based on assigned subjects)
-    teacher_workload = TeacherProfile.objects.annotate(
-        subject_count=Count('subjects', distinct=True),
-        class_count=Count('subjects__class_levels', distinct=True)
-    ).values(
-        'user__first_name',
-        'user__last_name',
-        'subject_count',
-        'class_count'
-    ).order_by('-subject_count')[:4]
+    # More detailed workload data
+    teacher_workload = get_teacher_workload()
+
+    for teacher in teacher_workload:
+        teacher['id'] = str(teacher['id'])
 
     recent_activities = get_recent_activities()
 
@@ -1063,14 +1059,13 @@ def admin_dashboard(request):
         
         'top_students': list(top_students),
         'subject_stats': list(subject_stats),
-        'teacher_workload': list(teacher_workload),
+        'teacher_workload': teacher_workload,
         'recent_activities': recent_activities,
         'core_subjects': core_subjects,
         'elective_subjects': elective_subjects,
     }
 
     return render(request, 'accounts/admin_dashboard.html', {'context': context})
-
 
 
 @login_required
@@ -1088,11 +1083,83 @@ def teacher_dashboard(request):
 
 @login_required
 def student_dashboard(request):
-    """Student dashboard"""
+    """Comprehensive student dashboard with all results and filters"""
+    if request.user.role != 'student':
+        return redirect('admin_dashboard')
+    
     student_profile = get_object_or_404(StudentProfile, user=request.user)
+    
+    # Get filter parameters
+    academic_year_id = request.GET.get('academic_year')
+    term_id = request.GET.get('term')
+    
+    # Base queryset for results
+    results = Result.objects.filter(
+        student=request.user,
+        is_published=True
+    ).select_related('subject', 'class_level', 'term', 'term__academic_year')
+    
+    # Apply filters
+    if academic_year_id:
+        results = results.filter(term__academic_year_id=academic_year_id)
+    if term_id:
+        results = results.filter(term_id=term_id)
+    
+    # Get available filters
+    academic_years = AcademicYear.objects.all().order_by('-start_date')
+    terms = Term.objects.all().order_by('-academic_year', 'start_date')
+    
+    # Group results by term
+    results_by_term = {}
+    for result in results:
+        term_key = f"{result.term.name} - {result.term.academic_year.name}"
+        if term_key not in results_by_term:
+            results_by_term[term_key] = {
+                'term': result.term,
+                'results': []
+            }
+        results_by_term[term_key]['results'].append(result)
+    
+    # Calculate statistics
+    total_results = results.count()
+    average_score = results.aggregate(avg=Avg('score'))['avg'] or 0
+    best_subject = results.order_by('-score').first()
+    worst_subject = results.order_by('score').first()
+    
+    # Grade distribution
+    grade_distribution = results.values('grade').annotate(
+        count=Count('id')
+    ).order_by('grade')
+    
+    # Subject performance
+    subject_performance = results.values(
+        'subject__name', 'subject__code'
+    ).annotate(
+        avg_score=Avg('score'),
+        count=Count('id'),
+        max_score=Max('score')
+    ).order_by('-avg_score')
+    
+    # Recent results (last 5)
+    recent_results = results.order_by('-date_uploaded')[:5]
     
     context = {
         'student': student_profile,
         'class_teacher': student_profile.class_teacher,
+        'results_by_term': results_by_term,
+        'recent_results': recent_results,
+        'total_results': total_results,
+        'average_score': round(average_score, 2),
+        'best_subject': best_subject,
+        'worst_subject': worst_subject,
+        'grade_distribution': grade_distribution,
+        'subject_performance': subject_performance,
+        'academic_years': academic_years,
+        'terms': terms,
+        'current_filters': {
+            'academic_year_id': academic_year_id,
+            'term_id': term_id,
+        }
     }
-    return render(request, 'accounts/student_dashboard.html', context)
+    
+    return render(request, 'accounts/student_dashboard.html', {'context': context})

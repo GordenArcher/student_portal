@@ -297,6 +297,112 @@ async function updateSubject(subjectId, formData) {
     }
 }
 
+
+// Assign teacher to subject
+async function assignTeacherToSubject(subjectId) {
+    try {
+        showLoader();
+        
+        // Get available teachers
+        const teachersResponse = await fetch('/academics/teachers/api/', {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCsrfToken(),
+            },
+        });
+
+        const teachersData = await teachersResponse.json();
+        hideLoader();
+
+        if (teachersData.success) {
+            showTeacherAssignmentModal(subjectId, teachersData.teachers);
+        } else {
+            showToast('Failed to load teachers', 'error');
+        }
+    } catch (error) {
+        hideLoader();
+        console.error('Error loading teachers:', error);
+        showToast('An error occurred while loading teachers', 'error');
+    }
+}
+
+// Show teacher assignment modal
+function showTeacherAssignmentModal(subjectId, teachers) {
+    const modal = document.createElement('div');
+    modal.className = 'modal show';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>👨‍🏫 Assign Teacher</h2>
+                <button class="modal-close close-modal">✕</button>
+            </div>
+            <form id="assignTeacherForm" data-subject-id="${subjectId}">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Select Teacher *</label>
+                        <select name="teacher_id" class="form-control" required>
+                            <option value="">Select a teacher...</option>
+                            ${teachers.map(teacher => `
+                                <option value="${teacher.id}">${teacher.name} (${teacher.email})</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div class="form-help">
+                        <i class="bi bi-info-circle"></i>
+                        This teacher will be assigned as the primary teacher for this subject.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Assign Teacher</button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.querySelector('#assignTeacherForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await submitTeacherAssignment(subjectId, new FormData(e.target));
+    });
+    
+    modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+}
+
+// Submit teacher assignment
+async function submitTeacherAssignment(subjectId, formData) {
+    try {
+        const response = await fetch(`/academics/subjects/${subjectId}/assign-teacher/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showToast(data.message, 'success');
+            document.querySelector('.modal.show')?.remove();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast(data.error || 'Failed to assign teacher', 'error');
+        }
+    } catch (error) {
+        console.error('Error assigning teacher:', error);
+        showToast('An error occurred while assigning teacher', 'error');
+    }
+}
+
 // Event listeners
 document.addEventListener('click', function(e) {
     if (e.target.closest('.delete-btn')) {
@@ -316,6 +422,12 @@ document.addEventListener('click', function(e) {
         const btn = e.target.closest('.edit-btn');
         const subjectId = btn.getAttribute('data-subject-id');
         editSubject(subjectId);
+    }
+
+    if (e.target.closest('.assign-teacher-btn')) {
+        const btn = e.target.closest('.assign-teacher-btn');
+        const subjectId = btn.getAttribute('data-subject-id');
+        window.location.href = `/academics/subjects/${subjectId}/manage-teachers/`;
     }
 });
 

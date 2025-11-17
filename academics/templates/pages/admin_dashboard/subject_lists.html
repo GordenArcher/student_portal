@@ -109,7 +109,15 @@
                         </div>
                         <div class="info-content">
                             <div class="info-label">Teacher</div>
-                            <div class="info-value">{{ subject.teacher.get_full_name|default:"Not assigned" }}</div>
+                            <div class="info-value">
+                                {% with subject.class_subjects.all as class_subjects %}
+                                    {% if class_subjects %}
+                                        {{ class_subjects.count }} assignment{{ class_subjects.count|pluralize }}
+                                    {% else %}
+                                        Not assigned
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
                         </div>
                     </div>
                     <div class="info-row">

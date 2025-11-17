@@ -58,7 +58,7 @@ function showDeleteConfirmation(studentId, studentName) {
 
 async function deleteStudent(studentId) {
     try {
-        const response = await fetch(`/users/${studentId}/delete/`, {
+        const response = await fetch(`/account/users/${studentId}/delete/`, {
             method: 'DELETE',
             headers: {
                 'X-CSRFToken': getCsrfToken(),
@@ -90,7 +90,7 @@ async function deleteStudent(studentId) {
 
 async function resetPassword(studentId) {
     try {
-        const response = await fetch(`/users/${studentId}/reset-password/`, {
+        const response = await fetch(`/account/users/${studentId}/reset-password/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCsrfToken(),
@@ -136,7 +136,7 @@ async function changePassword(studentId) {
 // Get student data for viewing/editing
 async function getStudentData(studentId) {
     try {
-        const response = await fetch(`/users/${studentId}/data/`, {
+        const response = await fetch(`/account/users/${studentId}/data/`, {
             method: 'GET',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
@@ -297,20 +297,12 @@ function showEditModal(studentData) {
                 <div class="modal-body">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label>First Name *</label>
+                            <label>First Name </label>
                             <input type="text" name="first_name" class="form-control" value="${studentData.first_name || ''}" required>
                         </div>
                         <div class="form-group">
-                            <label>Last Name *</label>
+                            <label>Last Name </label>
                             <input type="text" name="last_name" class="form-control" value="${studentData.last_name || ''}" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Email Address *</label>
-                            <input type="email" name="email" class="form-control" value="${studentData.email || ''}" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Phone Number</label>
-                            <input type="tel" name="phone_number" class="form-control" value="${studentData.phone_number || ''}">
                         </div>
                         <div class="form-group">
                             <label>Date of Birth</label>
@@ -328,7 +320,6 @@ function showEditModal(studentData) {
                             <label>Class</label>
                             <select name="current_class" class="form-control" required>
                                 <option value="">Select class...</option>
-                                <!-- Classes will be populated dynamically -->
                             </select>
                         </div>
                         <div class="form-group">
@@ -377,7 +368,7 @@ function showEditModal(studentData) {
 // Update student function
 async function updateStudent(studentId, formData) {
     try {
-        const response = await fetch(`/users/${studentId}/update/`, {
+        const response = await fetch(`/account/users/${studentId}/update/`, {
             method: 'POST',
             body: formData,
             headers: {
@@ -598,7 +589,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     showToast(data.message, 'success');
                     
-                    // Close modal and reload page after success
                     setTimeout(() => {
                         const modal = document.getElementById('studentModal');
                         if (modal) modal.style.display = 'none';
