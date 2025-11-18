@@ -180,18 +180,37 @@ async function viewStudent(studentId) {
     }
 }
 
+
+async function loadClasses() {
+    const response = await fetch('/account/ajax/classes/', {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+    })
+
+    if(response){
+        const data = await response.json()
+        console.log(data)
+        return data.classes
+    }else{
+        console.error('Error:', error);
+    }
+}
+
+
 // Edit student function
 async function editStudent(studentId) {
     try {
-        // Show loader
         showLoader();
         
         const studentData = await getStudentData(studentId);
+        const classes = await loadClasses();
+
         
-        if (studentData) {
-            // Hide loader and show edit modal
+        if (studentData || classes) {
             hideLoader();
-            showEditModal(studentData);
+            showEditModal(studentData, classes);
         } else {
             hideLoader();
         }
@@ -284,7 +303,7 @@ function showViewModal(studentData) {
 }
 
 // Show edit modal with student data
-function showEditModal(studentData) {
+function showEditModal(studentData, classes) {
     const modal = document.createElement('div');
     modal.className = 'modal show';
     modal.innerHTML = `
@@ -320,6 +339,9 @@ function showEditModal(studentData) {
                             <label>Class</label>
                             <select name="current_class" class="form-control" required>
                                 <option value="">Select class...</option>
+                                ${classes.map(cls => `
+                                    <option value="${cls.id}">${cls.name}</option>
+                                `).join('')}
                             </select>
                         </div>
                         <div class="form-group">

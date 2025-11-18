@@ -8,7 +8,6 @@ urlpatterns = [
     
     # User Management
     path('users/', views.user_list, name='user_list'),
-    path('users/create/', views.user_create, name='user_create'),
     path('users/<uuid:user_id>/', views.user_detail, name='user_detail'),
     path('users/<uuid:user_id>/update/', views.user_update, name='user_update'),
     path('users/<uuid:user_id>/delete/', views.user_delete, name='user_delete'),
@@ -16,6 +15,10 @@ urlpatterns = [
     # Teacher Profiles
     path('teachers/create/', views.register_teacher, name='teacher_create'),
     path('teachers/<int:teacher_id>/update/', views.teacher_update, name='teacher_update'),
+    path('teacher/classes/', views.my_classes, name='my_classes'),
+    path('teacher/students/', views.my_students, name='my_students'),
+    path('teacher/classes/<int:class_id>/students/', views.class_students_ajax, name='class_students_ajax'),
+    
     
     # Student Profiles
     path('students/create/', views.student_create, name='student_create'),
@@ -36,6 +39,8 @@ urlpatterns = [
 
         #Teacher
     path('dashboard/teacher/', views.teacher_dashboard, name='teacher_dashboard'),
+    path('dashboard/teacher/results_management/', views.manage_results, name='manage_results'),
+
 
         #Student
     path('dashboard/student/', views.student_dashboard, name='student_dashboard'),
@@ -45,4 +50,5 @@ urlpatterns = [
     path('users/<uuid:user_id>/toggle-status/', views.toggle_user_status, name='toggle_user_status'),
     path('users/<uuid:user_id>/data/', views.get_user_data, name='get_user_data'),
     path('users/<uuid:user_id>/change-password/', views.change_password, name='change_password'),
+    path('ajax/classes/', views.get_classes_ajax, name='ajax_classes'),
 ]

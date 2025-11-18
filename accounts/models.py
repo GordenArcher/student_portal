@@ -182,6 +182,16 @@ class StudentProfile(models.Model):
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.student_id}"
     
+    def get_average_score(self):
+        """Calculate average score for this student"""
+        from django.db.models import Avg
+        avg = self.result_set.aggregate(Avg('score'))['score__avg']
+        return round(avg, 1) if avg else None
+    
+    def get_recent_results(self, limit=5):
+        """Get recent results for this student"""
+        return self.result_set.select_related('subject', 'term', 'academic_year').order_by('-date_uploaded')[:limit]
+    
     @property
     def class_teacher(self):
         """Get the class teacher for this student's class."""
@@ -193,6 +203,7 @@ class StudentProfile(models.Model):
     def age(self):
         """Calculate student's age."""
         return self.user.age
+    
     
     
 

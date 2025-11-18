@@ -9,7 +9,6 @@
 
 {% block content %}
 <main class="main-content">
-    <!-- Page Header -->
     <div class="page-header">
         <div class="header-top">
             <div class="page-title">
@@ -29,17 +28,15 @@
         </div>
     </div>
 
-    <!-- Upload Form -->
     <div class="upload-form">
         <form id="uploadResultsForm">
             {% csrf_token %}
             
-            <!-- Basic Information -->
             <div class="form-section">
                 <h4>📝 Basic Information</h4>
                 <div class="filter-grid">
                     <div class="filter-group">
-                        <label>Academic Year *</label>
+                        <label>Academic Year </label>
                         <select name="academic_year_id" class="form-control" required id="academicYearSelect">
                             <option value="">Select Academic Year</option>
                             {% for year in context.academic_years %}
@@ -49,7 +46,7 @@
                     </div>
                     
                     <div class="filter-group">
-                        <label>Term *</label>
+                        <label>Term </label>
                         <select name="term_id" class="form-control" required id="termSelect">
                             <option value="">Select Term</option>
                             <!-- Terms will be populated dynamically -->
@@ -78,7 +75,6 @@
                 </div>
             </div>
 
-            <!-- Student Results -->
             <div class="form-section">
                 <div class="form-section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h4>🎓 Student Results</h4>
@@ -96,7 +92,6 @@
                 </div>
             </div>
 
-            <!-- Form Actions -->
             <div class="form-section">
                 <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border);">
                     <button type="button" class="btn btn-secondary" onclick="window.history.back()">
@@ -111,7 +106,6 @@
     </div>
 </main>
 
-<!-- Loading Modal -->
 <div id="loadingModal" class="confirmation-modal" style="display: none;">
     <div class="confirmation-content">
         <div class="confirmation-icon">

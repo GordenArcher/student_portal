@@ -301,6 +301,7 @@ body {
     box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
     position: relative;
     overflow: hidden;
+    z-index: 10;
 }
 
 .btn-login::before {

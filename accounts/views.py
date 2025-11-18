@@ -73,8 +73,6 @@ def register_teacher(request):
         else:
             data = request.POST
 
-        print(data)
-        
         first_name = data.get("first_name")
         last_name = data.get("last_name")
         email = data.get("email")
@@ -100,8 +98,10 @@ def register_teacher(request):
                 'error': 'A user with this email already exists.'
             }, status=400)
         
+        employee_id = generate_teacher_id()
+
         user = User.objects.create_user(
-            username=email,
+            username=employee_id,
             email=email,
             password=password or "changeme123",
             first_name=first_name,
@@ -116,7 +116,6 @@ def register_teacher(request):
             user.profile_picture = profile_picture
             user.save()
         
-        employee_id = generate_teacher_id()
         
         teacher_profile = TeacherProfile.objects.create(
             user=user,
@@ -195,7 +194,6 @@ def user_detail(request, user_id):
         'user': user,
     }
     
-    # Add role-specific profile
     if user.role == 'teacher' and hasattr(user, 'teacher_profile'):
         context['profile'] = user.teacher_profile
     elif user.role == 'student' and hasattr(user, 'student_profile'):
@@ -204,77 +202,6 @@ def user_detail(request, user_id):
         context['profile'] = user.staff_profile
     
     return render(request, 'accounts/user_detail.html', context)
-
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def user_create(request):
-    """Create a new user (Admin only). Works for both normal form and AJAX popup."""
-    if request.user.role != 'admin':
-        raise PermissionDenied("Only administrators can create new users.")
-
-    if request.method == 'POST':
-        try:
-            username = request.POST.get('username') or request.POST.get('email').split('@')[0]
-            email = request.POST.get('email')
-            password = request.POST.get('password') or 'changeme123'
-            first_name = request.POST.get('first_name')
-            last_name = request.POST.get('last_name')
-            role = request.POST.get('role')
-            phone_number = request.POST.get('phone_number')
-            date_of_birth = request.POST.get('date_of_birth') or None
-            gender = request.POST.get('gender') or None
-            profile_picture = request.FILES.get('profile_picture')
-
-            if role == 'admin' and not request.user.is_superuser:
-                msg = "Only the system superuser can create another admin."
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return JsonResponse({'status': 'error', 'message': msg}, status=403)
-                messages.error(request, msg)
-                return redirect('user_create')
-
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=password,
-                first_name=first_name,
-                last_name=last_name,
-                role=role,
-                phone_number=phone_number,
-                date_of_birth=date_of_birth,
-                gender=gender,
-            )
-
-            if profile_picture:
-                user.profile_picture = profile_picture
-                user.save()
-
-            success_msg = f"{user.get_full_name() or user.username} ({role}) created successfully!"
-
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'success', 'message': success_msg})
-
-            messages.success(request, success_msg)
-            if role == 'teacher':
-                return redirect('teachers_list')
-            elif role == 'student':
-                return redirect('students_list')
-            else:
-                return redirect('admin_dashboard')
-
-        except Exception as e:
-            error_msg = f"Error creating user: {str(e)}"
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'error', 'message': error_msg}, status=400)
-            messages.error(request, error_msg)
-
-    context = {
-        'roles': [r for r in User.ROLE_CHOICES if r[0] != 'admin'],
-        'genders': User.GENDER_CHOICES,
-    }
-    return render(request, 'accounts/user_form.html', context)
-
 
 
 @login_required
@@ -873,8 +800,6 @@ def student_update(request, student_id):
     return render(request, 'accounts/student_form.html', context)
 
 
-# ============ Staff Profile Views ============
-
 @login_required
 @require_http_methods(["GET", "POST"])
 def staff_create(request):
@@ -909,8 +834,6 @@ def staff_create(request):
     }
     return render(request, 'accounts/staff_form.html', context)
 
-
-# ============ API/JSON Endpoints ============
 
 @login_required
 def user_api_list(request):
@@ -965,8 +888,6 @@ def user_api_detail(request, user_id):
     
     return JsonResponse(data)
 
-
-# ============ Dashboard Views ============
 
 @login_required
 def admin_dashboard(request):
@@ -1073,16 +994,34 @@ def teacher_dashboard(request):
     """Teacher dashboard"""
     teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
     
+    subjects = teacher_profile.subjects.all()
+    
+    classes_taught = ClassLevel.objects.filter(
+        subjects__teacher=request.user
+    ).distinct()
+    
+    recent_results = Result.objects.filter(
+        uploaded_by=request.user
+    ).select_related('student', 'subject').order_by('-date_uploaded')[:5]
+    
+    total_students = StudentProfile.objects.filter(
+        current_class__subjects__teacher=request.user
+    ).distinct().count()
+
     context = {
         'teacher': teacher_profile,
-        'subjects': teacher_profile.subjects.all(),
-        'total_students': teacher_profile.total_students,
+        'subjects': subjects,
+        'classes_taught': classes_taught,
+        'total_students': total_students,
+        'recent_results': recent_results,
     }
+
     return render(request, 'accounts/teacher_dashboard.html', context)
 
 
 @login_required
 def student_dashboard(request):
+
     """Comprehensive student dashboard with all results and filters"""
     if request.user.role != 'student':
         return redirect('admin_dashboard')
@@ -1163,3 +1102,184 @@ def student_dashboard(request):
     }
     
     return render(request, 'accounts/student_dashboard.html', {'context': context})
+
+
+
+def get_classes_ajax(request):
+    if request.method == 'GET' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            classes = ClassLevel.objects.all().values('id', 'name')
+            classes_list = list(classes)
+            return JsonResponse({
+                'classes': classes_list
+            })
+        except Exception as e:
+            return JsonResponse({
+                'error': str(e)
+            }, status=500)
+    
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+
+
+@login_required
+def manage_results(request):
+    """Teacher results management page"""
+    teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
+    
+    subjects = teacher_profile.subjects.all()
+    classes_taught = ClassLevel.objects.filter(subjects__teachers=teacher_profile).distinct()
+    
+    results = Result.objects.filter(
+        subject__teachers=teacher_profile
+    ).select_related(
+        'student', 'subject', 'class_level', 'term', 'uploaded_by'
+    ).order_by('-date_uploaded')
+
+    subject_filter = request.GET.get('subject')
+    class_filter = request.GET.get('class_level')
+    term_filter = request.GET.get('term')
+    academic_year_filter = request.GET.get('academic_year')
+    
+    if subject_filter:
+        results = results.filter(subject_id=subject_filter)
+    if class_filter:
+        results = results.filter(student__student_profile__current_class_id=class_filter)
+    if term_filter:
+        results = results.filter(term_id=term_filter)
+    if academic_year_filter:
+        results = results.filter(academic_year=academic_year_filter)
+    
+    context = {
+        'teacher': teacher_profile,
+        'subjects': subjects,
+        'classes_taught': classes_taught,
+        'results': results,
+        'terms': Term.objects.all(),
+        'current_filters': {
+            'subject': subject_filter,
+            'class_level': class_filter,
+            'term': term_filter,
+            'academic_year': academic_year_filter,
+        }
+    }
+    
+    return render(request, 'pages/teacher_dashboard/manage_results.html', context)
+
+
+@login_required
+def my_classes(request):
+    """Teacher's classes page"""
+    teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
+    
+    # Get classes taught by this teacher with subject count
+    classes_taught = ClassLevel.objects.filter(
+        subjects__teacher=request.user
+    ).distinct().annotate(
+        subject_count=Count('subjects', filter=Q(subjects__teacher=request.user)),
+        student_count=Count('studentprofile', distinct=True)
+    )
+    
+    context = {
+        'teacher': teacher_profile,
+        'classes_taught': classes_taught,
+    }
+    
+    return render(request, 'pages/teacher_dashboard/my_classes.html', context)
+
+
+@login_required
+def my_students(request):
+    """Teacher's students page"""
+    teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
+    
+    # Get students taught by this teacher
+    students = StudentProfile.objects.filter(
+        current_class__subjects__teacher=request.user
+    ).distinct().select_related('user', 'current_class')
+    
+    # Filter by class if specified
+    class_filter = request.GET.get('class')
+    if class_filter:
+        students = students.filter(current_class_id=class_filter)
+    
+    # Get classes for filter dropdown
+    classes_taught = ClassLevel.objects.filter(
+        subjects__teacher=request.user
+    ).distinct()
+    
+    context = {
+        'teacher': teacher_profile,
+        'students': students,
+        'classes_taught': classes_taught,
+        'current_class_filter': class_filter,
+    }
+    
+    return render(request, 'pages/teacher_dashboard/my_students.html', context)
+
+
+@login_required
+def class_students_ajax(request, class_id):
+    """Get students for a specific class via AJAX"""
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
+            
+            # Verify teacher teaches this class
+            class_taught = get_object_or_404(
+                ClassLevel, 
+                id=class_id, 
+                subjects__teacher=teacher_profile
+            )
+            
+            students = StudentProfile.objects.filter(
+                current_class=class_taught
+            ).values('id', 'student_id', 'user__first_name', 'user__last_name')
+            
+            return JsonResponse({
+                'success': True,
+                'students': list(students)
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+    
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+def student_results_ajax(request, student_id):
+    """Get student results via AJAX"""
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
+            student = get_object_or_404(StudentProfile, id=student_id)
+            
+            # Verify teacher teaches this student
+            if not student.current_class.subjects.filter(teacher=teacher_profile).exists():
+                return JsonResponse({'error': 'Not authorized'}, status=403)
+            
+            results = student.result_set.filter(
+                subject__teacher=teacher_profile
+            ).select_related('subject', 'term', 'academic_year').values(
+                'id', 'score', 'grade', 'date_uploaded',
+                'subject__name', 'subject__code',
+                'term__name', 'academic_year__name'
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'results': list(results)
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+    
+    return JsonResponse({'error': 'Invalid request'}, status=400)
