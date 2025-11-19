@@ -43,15 +43,6 @@ class Subject(models.Model):
     category = models.CharField(max_length=20, choices=SUBJECT_CATEGORY_CHOICES, default='core')
     is_active = models.BooleanField(default=False)
     
-    teacher = models.ForeignKey(
-        'accounts.User',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="subjects_taught",
-        limit_choices_to={'role': 'teacher'}
-    )
-    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -156,7 +147,7 @@ class ClassSubject(models.Model):
 
 class Term(models.Model):
     """
-    Academic term within an academic year
+        Academic term within an academic year
     """
     name = models.CharField(max_length=50)
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name='terms')

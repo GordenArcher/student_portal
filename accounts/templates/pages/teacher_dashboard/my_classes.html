@@ -45,9 +45,11 @@
             <div class="class-subjects">
                 <h4>Subjects Teaching:</h4>
                 <div class="subjects-list">
+                    {{class }}
                     {% for subject in class.subjects.all %}
+                    {{ subject }}
                         {% if subject.teacher == teacher %}
-                        <span class="subject-tag">{{ subject.name }}</span>
+                        <span class="subject-tag">{{ subject }}</span>
                         {% endif %}
                     {% empty %}
                         <span class="no-subjects">No subjects assigned</span>

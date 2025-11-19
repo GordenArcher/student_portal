@@ -76,15 +76,11 @@
             <div class="student-stats">
                 <div class="stat">
                     <small>Average Score</small>
-                    <strong>
-                        {% with student.get_average_score as avg_score %}
-                            {{ avg_score|default:"-" }}{% if avg_score %}%{% endif %}
-                        {% endwith %}
-                    </strong>
+                    <!--  -->
                 </div>
                 <div class="stat">
                     <small>Results</small>
-                    <strong>{{ student.result_set.count }}</strong>
+                    <!-- <strong>{{ student.result_set.count }}</strong> -->
                 </div>
             </div>
             

@@ -40,6 +40,7 @@
                     <select name="class_level" class="form-control">
                         <option value="">All Classes</option>
                         {% for class in classes_taught %}
+                        {{ class }}
                         <option value="{{ class.id }}" {% if current_filters.class_level == class.id|stringformat:"s" %}selected{% endif %}>
                             {{ class.name }}
                         </option>

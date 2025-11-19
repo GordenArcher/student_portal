@@ -991,21 +991,22 @@ def admin_dashboard(request):
 
 @login_required
 def teacher_dashboard(request):
-    """Teacher dashboard"""
     teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
-    
-    subjects = teacher_profile.subjects.all()
-    
-    classes_taught = ClassLevel.objects.filter(
-        subjects__teacher=request.user
+
+    subjects = Subject.objects.filter(
+        classsubject__teacher=request.user
     ).distinct()
-    
+
+    classes_taught = ClassLevel.objects.filter(
+        classsubject__teacher=request.user
+    ).distinct()
+
     recent_results = Result.objects.filter(
         uploaded_by=request.user
     ).select_related('student', 'subject').order_by('-date_uploaded')[:5]
-    
+
     total_students = StudentProfile.objects.filter(
-        current_class__subjects__teacher=request.user
+        current_class__classsubject__teacher=request.user
     ).distinct().count()
 
     context = {
@@ -1121,36 +1122,48 @@ def get_classes_ajax(request):
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
-
-
 @login_required
 def manage_results(request):
-    """Teacher results management page"""
     teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
-    
-    subjects = teacher_profile.subjects.all()
-    classes_taught = ClassLevel.objects.filter(subjects__teachers=teacher_profile).distinct()
-    
+
+    # Subjects this teacher teaches based on class assignments
+    subjects = Subject.objects.filter(
+        classsubject__teacher=request.user,
+        is_active=True
+    ).distinct()
+
+    # Classes this teacher teaches
+    classes_taught = ClassLevel.objects.filter(
+        classsubject__teacher=request.user
+    ).distinct()
+
+    # Results only for subjects this teacher teaches
     results = Result.objects.filter(
-        subject__teachers=teacher_profile
+        subject__classsubject__teacher=request.user
     ).select_related(
         'student', 'subject', 'class_level', 'term', 'uploaded_by'
-    ).order_by('-date_uploaded')
+    ).order_by('-date_uploaded').distinct()
 
+    # ---- Filtering ----
     subject_filter = request.GET.get('subject')
     class_filter = request.GET.get('class_level')
     term_filter = request.GET.get('term')
     academic_year_filter = request.GET.get('academic_year')
-    
+
     if subject_filter:
         results = results.filter(subject_id=subject_filter)
+
     if class_filter:
-        results = results.filter(student__student_profile__current_class_id=class_filter)
+        results = results.filter(
+            student__student_profile__current_class_id=class_filter
+        )
+
     if term_filter:
         results = results.filter(term_id=term_filter)
+
     if academic_year_filter:
         results = results.filter(academic_year=academic_year_filter)
-    
+
     context = {
         'teacher': teacher_profile,
         'subjects': subjects,
@@ -1164,7 +1177,7 @@ def manage_results(request):
             'academic_year': academic_year_filter,
         }
     }
-    
+
     return render(request, 'pages/teacher_dashboard/manage_results.html', context)
 
 
@@ -1178,8 +1191,10 @@ def my_classes(request):
         subjects__teacher=request.user
     ).distinct().annotate(
         subject_count=Count('subjects', filter=Q(subjects__teacher=request.user)),
-        student_count=Count('studentprofile', distinct=True)
+        student_count=Count('students', distinct=True)
     )
+
+    print(teacher_profile)
     
     context = {
         'teacher': teacher_profile,

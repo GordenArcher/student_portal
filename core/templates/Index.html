@@ -120,7 +120,6 @@
             color: white;
         }
 
-        /* Hero Section */
         .hero {
             padding: 140px 0 80px;
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
@@ -277,7 +276,6 @@
             font-size: 14px;
         }
 
-        /* Responsive */
         @media (max-width: 768px) {
             .nav {
                 flex-direction: column;
@@ -325,7 +323,6 @@
     </style>
 </head>
 <body>
-    <!-- Header -->
     <header class="header">
         <div class="container">
             <nav class="nav">
@@ -338,18 +335,33 @@
                     <a href="#about">About</a>
                     <a href="#contact">Contact</a>
                     {% if user.is_authenticated %}
-                        <a href=" class="btn btn-primary">
-                            <i class="bi bi-person-circle"></i> Access Your Account
-                        </a>
+                        {% if user.role == 'admin' %}
+                            <a style="color: white;" href="{% url 'admin_dashboard' %}" class="btn btn-primary">
+                                <i class="bi bi-speedometer2"></i> Admin Dashboard
+                            </a>
+                        {% elif user.role == 'teacher' %}
+                            <a style="color: white;" href="{% url 'teacher_dashboard' %}" class="btn btn-primary">
+                                <i class="bi bi-speedometer2"></i> Teacher Dashboard
+                            </a>
+                        {% elif user.role == 'student' %}
+                            <a style="color: white;" href="{% url 'student_dashboard' %}" class="btn btn-primary">
+                                <i class="bi bi-speedometer2"></i> Student Dashboard
+                            </a>
+                        {% else %}
+                            <a style="color: white;" href="{% url 'dashboard' %}" class="btn btn-primary">
+                                <i class="bi bi-speedometer2"></i> Dashboard
+                            </a>
+                        {% endif %}
                     {% else %}
-                        <a href="{% url 'login' %}" class="btn btn-outline">Login</a>
+                        <a style="color: white;" href="{% url 'login' %}" class="btn btn-outline">
+                            <i class="bi bi-person-circle"></i> Login
+                        </a>
                     {% endif %}
                 </div>
             </nav>
         </div>
     </header>
 
-    <!-- Hero Section -->
     <section class="hero">
         <div class="container">
             <h1>New Star Academy Student Portal</h1>
@@ -368,7 +380,6 @@
         </div>
     </section>
 
-    <!-- Features Section -->
     <section class="features" id="features">
         <div class="container">
             <h2 class="section-title">Everything You Need</h2>
@@ -405,7 +416,6 @@
         </div>
     </section>
 
-    <!-- Stats Section -->
     <section class="stats">
         <div class="container">
             <h2 class="section-title">Our Community</h2>
