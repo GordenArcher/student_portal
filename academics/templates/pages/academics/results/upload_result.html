@@ -1,4 +1,4 @@
-{% extends "base/admin_d.html" %}
+{% extends "base/teacher_d.html" %}
 {% load static %}
 
 {% block title %}Upload Results{% endblock %}
@@ -21,7 +21,7 @@
                 </div>
             </div>
             <div class="header-actions">
-                <a href="{% url 'results_dashboard' %}" class="btn btn-secondary">
+                <a href="{% url 'manage_results' %}" class="btn btn-secondary">
                     <i class="bi bi-arrow-left"></i> Back to Results
                 </a>
             </div>

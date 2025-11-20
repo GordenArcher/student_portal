@@ -176,7 +176,7 @@ class TeacherProfileAdmin(admin.ModelAdmin):
     filter_horizontal = ('subjects',)
     autocomplete_fields = ['user']
     
-    inlines = []  # SubjectInline can be added if needed
+    inlines = []
     
     def user_full_name(self, obj):
         """Display teacher's full name"""
@@ -394,7 +394,6 @@ class StaffProfileAdmin(admin.ModelAdmin):
         return qs.select_related('user')
 
 
-# Customize admin site header and title
 admin.site.site_header = 'School Management System'
 admin.site.site_title = 'School Admin'
 admin.site.index_title = 'Administration Dashboard'

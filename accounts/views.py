@@ -1144,7 +1144,6 @@ def manage_results(request):
         'student', 'subject', 'class_level', 'term', 'uploaded_by'
     ).order_by('-date_uploaded').distinct()
 
-    # ---- Filtering ----
     subject_filter = request.GET.get('subject')
     class_filter = request.GET.get('class_level')
     term_filter = request.GET.get('term')
@@ -1185,17 +1184,19 @@ def manage_results(request):
 def my_classes(request):
     """Teacher's classes page"""
     teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
-    
-    # Get classes taught by this teacher with subject count
+
+    # Classes the teacher teaches
     classes_taught = ClassLevel.objects.filter(
-        subjects__teacher=request.user
+        classsubject__teacher=request.user
     ).distinct().annotate(
-        subject_count=Count('subjects', filter=Q(subjects__teacher=request.user)),
+        subject_count=Count(
+            'classsubject',
+            filter=Q(classsubject__teacher=request.user),
+            distinct=True
+        ),
         student_count=Count('students', distinct=True)
     )
 
-    print(teacher_profile)
-    
     context = {
         'teacher': teacher_profile,
         'classes_taught': classes_taught,
@@ -1206,95 +1207,87 @@ def my_classes(request):
 
 @login_required
 def my_students(request):
-    """Teacher's students page"""
     teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
-    
-    # Get students taught by this teacher
+    teacher_user = teacher_profile.user  # Use User instance
+
+    # Students the teacher actually teaches
     students = StudentProfile.objects.filter(
-        current_class__subjects__teacher=request.user
+        current_class__classsubject__teacher=teacher_user
     ).distinct().select_related('user', 'current_class')
-    
-    # Filter by class if specified
+
     class_filter = request.GET.get('class')
     if class_filter:
         students = students.filter(current_class_id=class_filter)
-    
-    # Get classes for filter dropdown
+
+    # Classes the teacher teaches
     classes_taught = ClassLevel.objects.filter(
-        subjects__teacher=request.user
+        classsubject__teacher=teacher_user
     ).distinct()
-    
+
     context = {
         'teacher': teacher_profile,
         'students': students,
         'classes_taught': classes_taught,
         'current_class_filter': class_filter,
     }
-    
+
     return render(request, 'pages/teacher_dashboard/my_students.html', context)
 
 
 @login_required
 def class_students_ajax(request, class_id):
-    """Get students for a specific class via AJAX"""
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
             teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
-            
+            teacher_user = teacher_profile.user 
+
             # Verify teacher teaches this class
             class_taught = get_object_or_404(
-                ClassLevel, 
-                id=class_id, 
-                subjects__teacher=teacher_profile
+                ClassLevel,
+                id=class_id,
+                class_subjects__teacher=teacher_user
             )
-            
+
             students = StudentProfile.objects.filter(
                 current_class=class_taught
-            ).values('id', 'student_id', 'user__first_name', 'user__last_name')
-            
-            return JsonResponse({
-                'success': True,
-                'students': list(students)
-            })
-            
+            ).values(
+                'id', 'student_id', 'user__first_name', 'user__last_name'
+            )
+
+            return JsonResponse({'success': True, 'students': list(students)})
+
         except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            }, status=400)
-    
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
     return JsonResponse({'error': 'Invalid request'}, status=400)
+
 
 
 @login_required
 def student_results_ajax(request, student_id):
-    """Get student results via AJAX"""
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
             teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
             student = get_object_or_404(StudentProfile, id=student_id)
-            
+
             # Verify teacher teaches this student
-            if not student.current_class.subjects.filter(teacher=teacher_profile).exists():
+            if not student.current_class.class_subjects.filter(teacher=teacher_profile).exists():
                 return JsonResponse({'error': 'Not authorized'}, status=403)
-            
+
+            # Pull only results for subjects this teacher teaches
             results = student.result_set.filter(
-                subject__teacher=teacher_profile
-            ).select_related('subject', 'term', 'academic_year').values(
+                subject__classsubject__teacher=teacher_profile
+            ).select_related(
+                'subject', 'term', 'academic_year'
+            ).values(
                 'id', 'score', 'grade', 'date_uploaded',
                 'subject__name', 'subject__code',
                 'term__name', 'academic_year__name'
             )
-            
-            return JsonResponse({
-                'success': True,
-                'results': list(results)
-            })
-            
+
+            return JsonResponse({'success': True, 'results': list(results)})
+
         except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            }, status=400)
-    
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
     return JsonResponse({'error': 'Invalid request'}, status=400)

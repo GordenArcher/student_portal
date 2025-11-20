@@ -169,7 +169,9 @@ class Term(models.Model):
 class Result(models.Model):
     """
         Result model — teacher uploads, student views
+        Extended to include class score and exam score.
     """
+    
     TERM_CHOICES = [
         ("1st", "First Term"),
         ("2nd", "Second Term"),
@@ -200,12 +202,25 @@ class Result(models.Model):
     class_level = models.ForeignKey(ClassLevel, on_delete=models.CASCADE)
     term = models.ForeignKey(Term, on_delete=models.CASCADE)
     
-    score = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2,
+    class_score = models.DecimalField(
+        max_digits=5, decimal_places=2,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
-        help_text="Score out of 100"
+        default=0,
+        help_text="Continuous Assessment score (e.g., 30%)"
     )
+    exam_score = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        default=0,
+        help_text="Exam score (e.g., 70%)"
+    )
+    score = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text="Total score (class + exam)",
+        blank=True, null=True
+    )
+
     grade = models.CharField(max_length=2, choices=GRADE_CHOICES, blank=True)
     grade_point = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     remarks = models.TextField(blank=True, null=True)
@@ -239,7 +254,7 @@ class Result(models.Model):
         return f"{self.student.get_full_name()} - {self.subject.name} ({self.term}) - {self.score}%"
 
     def calculate_grade(self):
-        """Calculate grade based on score"""
+        """Calculate grade based on total score"""
         if self.score >= 90:
             return "A+", 4.0
         elif self.score >= 80:
@@ -262,6 +277,11 @@ class Result(models.Model):
             return "F", 0.0
 
     def save(self, *args, **kwargs):
+        # Calculate total score as weighted sum (optional: 30% CA, 70% Exam)
+        if self.class_score is not None and self.exam_score is not None:
+            self.score = round((self.class_score * 0.3) + (self.exam_score * 0.7), 2)
+
+        # Calculate grade and grade point
         if self.score is not None:
             self.grade, self.grade_point = self.calculate_grade()
             

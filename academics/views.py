@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models import Q, Avg, Max, Min, Count
 from django.core.paginator import Paginator
 import json
-from accounts.models import User
+from accounts.models import User, TeacherProfile
 from .models import Subject, ClassLevel, AcademicYear, Term, ClassSubject, Result
 import ast
 from django.utils import timezone
@@ -1012,10 +1012,19 @@ def results_dashboard(request):
     
     return render(request, 'pages/admin_dashboard/results.html', {'context': context})
 
-
 @login_required
 def upload_results(request):
     """Upload results for a class and subject"""
+    
+    # Only teachers allowed
+    if request.user.role != 'teacher':
+        return JsonResponse({
+            'success': False,
+            'error': 'Only teachers can upload results.'
+        }, status=403)
+    
+    teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
+
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -1028,18 +1037,16 @@ def upload_results(request):
             subject = get_object_or_404(Subject, id=subject_id)
             term = get_object_or_404(Term, id=term_id)
             
-            # Check permissions
-            if request.user.role == 'teacher':
-                if not (subject.teacher == request.user or 
-                       ClassSubject.objects.filter(
-                           class_level=class_level,
-                           subject=subject,
-                           teacher=request.user
-                       ).exists()):
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'You are not assigned to teach this subject for this class'
-                    }, status=403)
+            # Verify teacher actually teaches this subject for this class
+            if not ClassSubject.objects.filter(
+                class_level=class_level,
+                subject=subject,
+                teacher=request.user
+            ).exists():
+                return JsonResponse({
+                    'success': False,
+                    'error': 'You are not assigned to teach this subject for this class.'
+                }, status=403)
             
             created_count = 0
             updated_count = 0
@@ -1075,7 +1082,7 @@ def upload_results(request):
             return JsonResponse({
                 'success': True,
                 'message': f'Successfully processed {created_count + updated_count} results '
-                          f'({created_count} created, {updated_count} updated)',
+                           f'({created_count} created, {updated_count} updated)',
                 'created_count': created_count,
                 'updated_count': updated_count
             })
@@ -1089,12 +1096,9 @@ def upload_results(request):
     # GET request - show upload form
     academic_years = AcademicYear.objects.all().order_by('-start_date')
     class_levels = ClassLevel.objects.filter(is_active=True)
-    subjects = Subject.objects.filter(is_active=True)
-    
-    if request.user.role == 'teacher':
-        subjects = subjects.filter(
-            Q(teacher=request.user) | Q(class_subjects__teacher=request.user)
-        ).distinct()
+    subjects = Subject.objects.filter(
+        classsubject__teacher=request.user
+    ).distinct()
     
     context = {
         'academic_years': academic_years,
@@ -1102,7 +1106,7 @@ def upload_results(request):
         'subjects': subjects,
     }
     
-    return render(request, 'academics/results/upload.html', {'context': context})
+    return render(request, 'pages/academics/results/upload_result.html', {"context": context})
 
 
 @login_required
