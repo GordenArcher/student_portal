@@ -6,7 +6,6 @@
 {% block extra_css %}
     <link rel="stylesheet" href="{% static 'styles/pages/results_management.css' %}">
 {% endblock extra_css %}
-<!-- naaamoah109@gmail.com -->
 {% block content %}
 <div class="main-content">
     <div class="content-header">
@@ -81,76 +80,77 @@
         </div>
         <div class="card-body">
             {% if results %}
-            <div class="table-responsive">
-                <table class="results-table">
-                    <thead>
-                        <tr>
-                            <th>Student</th>
-                            <th>Subject</th>
-                            <th>Class</th>
-                            <th>Score</th>
-                            <th>Grade</th>
-                            <th>Term</th>
-                            <th>Date Uploaded</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="results-tbody">
-                        {% for result in results %}
-                        <tr data-result-id="{{ result.id }}">
-                            <td>
-                                <div class="student-info">
-                                    <div class="student-avatar-sm">
-                                        {% if result.student.user.profile_picture %}
-                                            <img src="{{ result.student.user.profile_picture.url }}" alt="{{ result.student.user.get_full_name }}">
-                                        {% else %}
-                                            <i class="bi bi-person-circle"></i>
-                                        {% endif %}
+               <div class="table-responsive">
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Subject</th>
+                                <th>Class</th>
+                                <th>Score</th>
+                                <th>Grade</th>
+                                <th>Term</th>
+                                <th>Date Uploaded</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="results-tbody">
+                            {% for result in results %}
+                            <tr data-result-id="{{ result.id }}">
+                                <td>
+                                    <div class="student-info">
+                                        <div class="student-avatar-sm">
+                                            {% if result.student.profile_picture %}
+                                                <img src="{{ result.student.profile_picture.url }}" alt="{{ result.student.get_full_name }}">
+                                            {% else %}
+                                                <i class="bi bi-person-circle"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="student-details">
+                                            <strong>{{ result.student.get_full_name }}</strong>
+                                            <small>{{ result.student.student_profile.student_id }}</small>
+                                        </div>
                                     </div>
-                                    <div class="student-details">
-                                        <strong>{{ result.student.user.get_full_name }}</strong>
-                                        <small>{{ result.student.student_id }}</small>
+                                </td>
+                                <td>
+                                    <div class="subject-info">
+                                        <strong>{{ result.subject.name }}</strong>
+                                        <small>{{ result.subject.code }}</small>
                                     </div>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="subject-info">
-                                    <strong>{{ result.subject.name }}</strong>
-                                    <small>{{ result.subject.code }}</small>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="class-badge">{{ result.student.current_class.name }}</span>
-                            </td>
-                            <td>
-                                <div class="score-display">
-                                    <span class="score-value">{{ result.score }}</span>
-                                    <small>%</small>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="grade-badge grade-{{ result.grade|lower }}">{{ result.grade }}</span>
-                            </td>
-                            <td>
-                                <span class="term-badge">{{ result.term.name }} {{ result.academic_year.name }}</span>
-                            </td>
-                            <td>
-                                <span class="upload-date">{{ result.date_uploaded|date:"M d, Y" }}</span>
-                            </td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="btn btn-sm btn-outline-danger delete-result" 
-                                            data-result-id="{{ result.id }}"
-                                            title="Delete Result">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                                </td>
+                                <td>
+                                    <span class="class-badge">{{ result.class_level.name }}</span>
+                                </td>
+                                <td>
+                                    <div class="score-display">
+                                        <span class="score-value">{{ result.score|floatformat:2 }}</span>
+                                        <small>%</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="grade-badge grade-{{ result.grade|lower|cut:'+' }}{% if '+' in result.grade %}plus{% endif %}">{{ result.grade }}</span>
+                                </td>
+                                <td>
+                                    <span class="term-badge">{{ result.term.name }} {{ result.term.academic_year.name }}</span>
+                                </td>
+                                <td>
+                                    <span class="upload-date">{{ result.date_uploaded|date:"M d, Y" }}</span>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn btn-sm btn-outline-danger delete-result" 
+                                                data-result-id="{{ result.id }}"
+                                                title="Delete Result">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% else %}
             <div class="empty-state">
                 <i class="bi bi-journal-x"></i>

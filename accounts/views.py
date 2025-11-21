@@ -13,7 +13,6 @@ from datetime import timedelta
 from django.db import transaction
 from .utils.generateID import generate_teacher_id, generate_student_id
 from core.views import get_recent_activities, get_teacher_workload
-from django.core.exceptions import PermissionDenied
 from django.db.models import Case, When, Q, Count, Avg, Max
 from django.db import models
 
@@ -1201,6 +1200,7 @@ def my_classes(request):
         'teacher': teacher_profile,
         'classes_taught': classes_taught,
     }
+
     
     return render(request, 'pages/teacher_dashboard/my_classes.html', context)
 

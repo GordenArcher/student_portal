@@ -14,6 +14,20 @@ import ast
 from django.utils import timezone
 from django.db import models
 
+from datetime import datetime
+from django.http import HttpResponse
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.chart import BarChart, PieChart, Reference
+from openpyxl.cell.cell import MergedCell
+import openpyxl
+import io
+
 
 
 @login_required
@@ -1012,6 +1026,7 @@ def results_dashboard(request):
     
     return render(request, 'pages/admin_dashboard/results.html', {'context': context})
 
+
 @login_required
 def upload_results(request):
     """Upload results for a class and subject"""
@@ -1107,6 +1122,180 @@ def upload_results(request):
     }
     
     return render(request, 'pages/academics/results/upload_result.html', {"context": context})
+
+
+
+
+@login_required
+def upload_results_form(request):
+    """GET: Show the upload results form"""
+
+    if request.user.role != 'teacher':
+        return render(request, 'pages/academics/results/not_allowed.html', {
+            'message': 'Only teachers can upload results.'
+        }, status=403)
+
+    # Only classes this teacher actually teaches
+    class_levels = ClassLevel.objects.filter(
+        classsubject__teacher=request.user,
+        is_active=True
+    ).distinct()
+
+    # Only subjects this teacher teaches
+    subjects = Subject.objects.filter(
+        classsubject__teacher=request.user
+    ).distinct()
+
+    academic_years = AcademicYear.objects.all().order_by('-start_date')
+
+    context = {
+        'academic_years': academic_years,
+        'class_levels': class_levels,
+        'subjects': subjects,
+    }
+
+    return render(request, 'pages/academics/results/upload_result.html', context)
+
+
+
+@login_required
+def upload_results_submit(request):
+    """Process ONE student's result"""
+
+    if request.user.role != 'teacher':
+        return JsonResponse({'success': False, 'error': "Only teachers can upload results."}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': "Invalid request method."}, status=400)
+
+    try:
+        data = request.POST
+
+        student_id = data.get("student")
+        class_level_id = data.get("class_level")
+        subject_id = data.get("subject")
+        term_id = data.get("term")
+        academic_year_id = data.get("academic_year")
+
+        calculation_mode = data.get("calculation_mode", "system")  # system | manual
+        class_score = data.get("class_score")
+        exam_score = data.get("exam_score")
+        manual_score = data.get("score")
+
+        is_published = data.get("is_published") == "on"
+        remarks = data.get("remarks", "").strip()
+
+        required = {
+            'student': student_id,
+            'class_level': class_level_id,
+            'subject': subject_id,
+            'term': term_id,
+            'academic_year': academic_year_id
+        }
+
+        missing = [f for f, v in required.items() if not v]
+        if missing:
+            return JsonResponse({
+                'success': False,
+                'error': f"Missing required fields: {', '.join(missing)}"
+            }, status=400)
+
+        student = get_object_or_404(User, id=student_id, role="student")
+        class_level = get_object_or_404(ClassLevel, id=class_level_id)
+        subject = get_object_or_404(Subject, id=subject_id)
+        term = get_object_or_404(Term, id=term_id)
+        academic_year = get_object_or_404(AcademicYear, id=academic_year_id)
+
+        if student.student_profile.current_class != class_level:
+            return JsonResponse({
+                'success': False,
+                'error': f"Student {student.get_full_name()} is not in class {class_level.name}."
+            }, status=400)
+
+        if not ClassSubject.objects.filter(
+            class_level=class_level,
+            subject=subject,
+            teacher=request.user
+        ).exists():
+            return JsonResponse({
+                'success': False,
+                'error': "You are not assigned to teach this subject for this class."
+            }, status=403)
+
+        score_data = {}
+
+        if calculation_mode == "system":
+            try:
+                class_val = float(class_score or 0)
+                exam_val = float(exam_score or 0)
+            except:
+                return JsonResponse({'success': False, 'error': "Invalid score format."}, status=400)
+
+            if not (0 <= class_val <= 100):
+                return JsonResponse({'success': False, 'error': "Class score must be 0-100."}, status=400)
+
+            if not (0 <= exam_val <= 100):
+                return JsonResponse({'success': False, 'error': "Exam score must be 0-100."}, status=400)
+
+            score_data = {
+                'class_score': class_val,
+                'exam_score': exam_val,
+                'score': None,
+            }
+
+        else:
+            try:
+                manual_val = float(manual_score or 0)
+                class_val = float(class_score or 0)
+                exam_val = float(exam_score or 0)
+            except:
+                return JsonResponse({
+                    'success': False,
+                    'error': "Invalid numeric input."
+                }, status=400)
+
+            if not (0 <= manual_val <= 100):
+                return JsonResponse({
+                    'success': False,
+                    'error': "Total score must be 0-100."
+                }, status=400)
+
+            score_data = {
+                'class_score': class_val,
+                'exam_score': exam_val,
+                'score': manual_val,
+            }
+
+        result_data = {
+            **score_data,
+            'class_level': class_level,
+            'term': term,
+            'uploaded_by': request.user,
+            'remarks': remarks if remarks else None,
+            'is_published': is_published,
+        }
+
+        if is_published:
+            result_data['published_date'] = timezone.now()
+
+        result, created = Result.objects.update_or_create(
+            student=student,
+            subject=subject,
+            term=term,
+            defaults=result_data
+        )
+
+        return JsonResponse({
+            'success': True,
+            'created': created,
+            'message': f"Result {'created' if created else 'updated'} successfully."
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f"Unexpected error: {str(e)}"
+        }, status=500)
 
 
 @login_required
@@ -1333,8 +1522,16 @@ def get_terms_for_academic_year(request):
     """Get terms for a specific academic year"""
     academic_year_id = request.GET.get('academic_year')
     
-    if not academic_year_id:
-        return JsonResponse({'success': False, 'error': 'Academic year ID required'})
+    # if not academic_year_id:
+    #     return JsonResponse({'success': False, 'error': 'Academic year ID required'})
+
+    # NOTE:
+    # We are NOT validating academic_year_id here.
+    # The <select> on the frontend loads with an empty default option (no value).
+    # If we enforce "academic_year_id is required", the client would receive an 
+    # unnecessary error before the teacher actually selects a year.
+    # Therefore, we skip the check to avoid sending an error when the field is still empty.
+
     
     terms = Term.objects.filter(academic_year_id=academic_year_id).values(
         'id', 'name', 'start_date', 'end_date'
@@ -1348,26 +1545,6 @@ def get_terms_for_academic_year(request):
 
 
 
-
-
-import os
-import json
-from datetime import datetime
-from django.http import HttpResponse
-from django.conf import settings
-from django.template.loader import render_to_string
-from django.db.models import Avg, Count, Q
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.lib.units import inch
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill
-from openpyxl.chart import BarChart, PieChart, Reference
-from openpyxl.cell.cell import MergedCell
-import openpyxl
-import io
 
 @login_required
 def export_analysis_report(request):
@@ -1740,7 +1917,7 @@ def export_excel_report(analysis_data, request):
             percentage = (grade['count'] / analysis_data['summary']['total_results'] * 100) if analysis_data['summary']['total_results'] > 0 else 0
             grade_sheet[f'A{i}'] = grade['grade']
             grade_sheet[f'B{i}'] = grade['count']
-            grade_sheet[f'C{i}'] = percentage / 100  # Excel percentage format
+            grade_sheet[f'C{i}'] = percentage / 100 
         
         # Style grade sheet
         for row in grade_sheet['A1:C1']:
@@ -1748,12 +1925,10 @@ def export_excel_report(analysis_data, request):
                 cell.font = Font(bold=True, color="FFFFFF")
                 cell.fill = PatternFill(start_color="10b981", end_color="10b981", fill_type="solid")
         
-        # Format percentage column
         for cell in grade_sheet['C']:
             if cell.row > 1:
                 cell.number_format = '0.0%'
         
-        # Subject Performance Sheet
         subject_sheet = wb.create_sheet("Subject Performance")
         
         subject_headers = ['Subject', 'Code', 'Avg Score', 'Students', 'Pass Count', 'Pass Rate', 'High Score', 'Low Score']
@@ -1771,20 +1946,17 @@ def export_excel_report(analysis_data, request):
             subject_sheet.cell(row=i, column=7, value=subject['max_score'])
             subject_sheet.cell(row=i, column=8, value=subject.get('min_score', 0))
         
-        # Style subject sheet header
         for col in range(1, len(subject_headers) + 1):
             cell = subject_sheet.cell(row=1, column=col)
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill(start_color="f59e0b", end_color="f59e0b", fill_type="solid")
         
-        # Format percentage and score columns
         for row in range(2, len(analysis_data['subject_performance']) + 2):
             subject_sheet.cell(row=row, column=6).number_format = '0.0%'
             subject_sheet.cell(row=row, column=3).number_format = '0.0'
             subject_sheet.cell(row=row, column=7).number_format = '0.0'
             subject_sheet.cell(row=row, column=8).number_format = '0.0'
         
-        # Class Performance Sheet
         class_sheet = wb.create_sheet("Class Performance")
         
         class_headers = ['Class', 'Avg Score', 'Students', 'Pass Rate']
@@ -1797,18 +1969,15 @@ def export_excel_report(analysis_data, request):
             class_sheet.cell(row=i, column=3, value=class_perf['total_students'])
             class_sheet.cell(row=i, column=4, value=class_perf['pass_rate'] / 100)
         
-        # Style class sheet
         for col in range(1, len(class_headers) + 1):
             cell = class_sheet.cell(row=1, column=col)
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill(start_color="8b5cf6", end_color="8b5cf6", fill_type="solid")
         
-        # Format columns
         for row in range(2, len(analysis_data['class_performance']) + 2):
             class_sheet.cell(row=row, column=2).number_format = '0.0'
             class_sheet.cell(row=row, column=4).number_format = '0.0%'
         
-        # Top Performers Sheet
         if analysis_data['top_performers']:
             top_sheet = wb.create_sheet("Top Performers")
             
@@ -1825,17 +1994,14 @@ def export_excel_report(analysis_data, request):
                 top_sheet.cell(row=i, column=6, value=performer['score'])
                 top_sheet.cell(row=i, column=7, value=performer['grade'])
             
-            # Style top performers sheet
             for col in range(1, len(top_headers) + 1):
                 cell = top_sheet.cell(row=1, column=col)
                 cell.font = Font(bold=True, color="FFFFFF")
                 cell.fill = PatternFill(start_color="ef4444", end_color="ef4444", fill_type="solid")
             
-            # Format score column
             for row in range(2, len(analysis_data['top_performers']) + 2):
                 top_sheet.cell(row=row, column=6).number_format = '0.0'
         
-        # Auto-adjust column widths
         for sheet in wb.sheetnames:
             ws = wb[sheet]
             for col in ws.columns:
@@ -1843,7 +2009,6 @@ def export_excel_report(analysis_data, request):
                 col_letter = None
                 
                 for cell in col:
-                    # Skip merged cells
                     if isinstance(cell, MergedCell):
                         continue
                     
@@ -1859,12 +2024,10 @@ def export_excel_report(analysis_data, request):
                 if col_letter:
                     ws.column_dimensions[col_letter].width = (max_length + 2) * 1.2
         
-        # Save to buffer
         buffer = io.BytesIO()
         wb.save(buffer)
         buffer.seek(0)
         
-        # Create HTTP response
         response = HttpResponse(
             buffer.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -1875,3 +2038,503 @@ def export_excel_report(analysis_data, request):
         
     except Exception as e:
         return HttpResponse(f"Error generating Excel report: {str(e)}", status=500)
+    
+
+@login_required
+def terms_list(request):
+    """
+    Main terms list view - renders the template
+    """
+    academic_years = AcademicYear.objects.all().order_by('-start_date')
+    
+    context = {
+        'academic_years': academic_years,
+    }
+    
+    return render(request, "pages/academics/terms.html", context)
+
+
+@login_required
+def api_terms_list(request):
+    """
+    API endpoint for terms list with filtering and pagination
+    """
+    try:
+        academic_year_id = request.GET.get('academic_year')
+        status_filter = request.GET.get('status')
+        search_query = request.GET.get('search', '')
+        page_number = int(request.GET.get('page', 1))
+        
+        terms = Term.objects.select_related('academic_year').all()
+        
+        if academic_year_id:
+            terms = terms.filter(academic_year_id=academic_year_id)
+        
+        if status_filter:
+            today = timezone.now().date()
+            if status_filter == 'current':
+                terms = terms.filter(is_current=True)
+            elif status_filter == 'upcoming':
+                terms = terms.filter(start_date__gt=today)
+            elif status_filter == 'past':
+                terms = terms.filter(end_date__lt=today)
+            elif status_filter == 'active':
+                terms = terms.filter(start_date__lte=today, end_date__gte=today)
+        
+        if search_query:
+            terms = terms.filter(
+                Q(name__icontains=search_query) |
+                Q(academic_year__name__icontains=search_query)
+            )
+        
+        # Order by start date (most recent first)
+        terms = terms.order_by('-start_date')
+        
+        paginator = Paginator(terms, 10)  # 10 items per page
+        page_obj = paginator.get_page(page_number)
+        
+        terms_data = []
+        for term in page_obj:
+            terms_data.append({
+                'id': term.id,
+                'name': term.name,
+                'academic_year_id': term.academic_year.id,
+                'academic_year_name': term.academic_year.name,
+                'start_date': term.start_date.isoformat(),
+                'end_date': term.end_date.isoformat(),
+                'is_current': term.is_current,
+            })
+        
+        pagination_data = {
+            'current_page': page_obj.number,
+            'total_pages': paginator.num_pages,
+            'total_count': paginator.count,
+            'has_previous': page_obj.has_previous(),
+            'has_next': page_obj.has_next(),
+            'start_index': page_obj.start_index(),
+            'end_index': page_obj.end_index(),
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'terms': terms_data,
+            'pagination': pagination_data
+        })
+        
+    except Exception as e:
+        # logger.error(f"Error in api_terms_list: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Failed to load terms'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_update_term(request):
+    """
+    API endpoint to update a term
+    """
+    try:
+        term_id = request.POST.get('term_id')
+        term = get_object_or_404(Term, id=term_id)
+        
+        name = request.POST.get('name')
+        academic_year_id = request.POST.get('academic_year')
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+        is_current = request.POST.get('is_current') == 'on'
+        
+        if not all([name, academic_year_id, start_date, end_date]):
+            return JsonResponse({
+                'success': False,
+                'error': 'All fields are required'
+            }, status=400)
+        
+        academic_year = get_object_or_404(AcademicYear, id=academic_year_id)
+        
+        if Term.objects.filter(
+            name=name, 
+            academic_year=academic_year
+        ).exclude(id=term_id).exists():
+            return JsonResponse({
+                'success': False,
+                'error': f'A term with name "{name}" already exists in {academic_year.name}'
+            }, status=400)
+        
+        term.name = name
+        term.academic_year = academic_year
+        term.start_date = start_date
+        term.end_date = end_date
+        
+        if is_current:
+            set_current_term(term)
+        else:
+            term.is_current = False
+            term.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Term "{term.name}" updated successfully'
+        })
+        
+    except Exception as e:
+        # logger.error(f"Error updating term: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Failed to update term'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_delete_term(request):
+    """
+    API endpoint to delete a term
+    """
+    try:
+        data = json.loads(request.body)
+        term_id = data.get('term_id')
+        term = get_object_or_404(Term, id=term_id)
+        
+        # Check if term has related records
+        if term.results.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot delete term with associated results'
+            }, status=400)
+        
+        term_name = term.name
+        term.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Term "{term_name}" deleted successfully'
+        })
+        
+    except Exception as e:
+        # logger.error(f"Error deleting term: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Failed to delete term'
+        }, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_set_current_term(request):
+    """
+    API endpoint to set a term as current
+    """
+    try:
+        data = json.loads(request.body)
+        term_id = data.get('term_id')
+        term = get_object_or_404(Term, id=term_id)
+        
+        set_current_term(term)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Term "{term.name}" set as current term'
+        })
+        
+    except Exception as e:
+        # logger.error(f"Error setting current term: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Failed to set current term'
+        }, status=500)
+    
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def create_term(request):
+    """
+    Handle term creation - both form display and form submission
+    """
+    if request.method == 'GET':
+        return render_create_term_form(request)
+    else:
+        return handle_term_creation(request)
+
+
+@login_required
+def render_create_term_form(request):
+    """
+        Render the term creation form with required context
+    """
+    academic_years = AcademicYear.objects.filter(
+        end_date__gte=timezone.now().date()
+    ).order_by('-start_date')
+    
+    context = {
+        'academic_years': academic_years,
+    }
+    
+    return render(request, 'pages/academics/create_term.html', context)
+
+
+@transaction.atomic
+def handle_term_creation(request):
+    """
+        Process term creation form submission
+    """
+    try:
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        
+        term_data = extract_term_data(request)
+        
+        validation_errors = validate_term_data(term_data)
+        if validation_errors:
+            return error_response(validation_errors, is_ajax)
+        
+        academic_year = get_object_or_404(
+            AcademicYear, 
+            id=term_data['academic_year_id']
+        )
+        
+        if Term.objects.filter(
+            name=term_data['name'],
+            academic_year=academic_year
+        ).exists():
+            error_msg = f"A term with name '{term_data['name']}' already exists in {academic_year.name}."
+            return error_response(error_msg, is_ajax)
+        
+        date_errors = validate_date_ranges(term_data, academic_year)
+        if date_errors:
+            return error_response(date_errors, is_ajax)
+        
+        overlap_errors = check_term_overlaps(term_data, academic_year)
+        if overlap_errors:
+            return error_response(overlap_errors, is_ajax)
+        
+        
+        term = create_term_instance(term_data, academic_year, request.user)
+        
+        if term_data.get('is_current'):
+            set_current_term(term)
+        
+        success_message = f"Term '{term.name}' for {academic_year.name} created successfully!"
+        
+        if is_ajax:
+            return JsonResponse({
+                'success': True,
+                'message': success_message,
+                'term_id': term.id,
+            })
+        else:
+            messages.success(request, success_message)
+            return redirect('terms_list')
+            
+    except Exception as e:
+        # logger.error(f"Error creating term: {str(e)}")
+        error_msg = "An unexpected error occurred while creating the term."
+        
+        if is_ajax:
+            return JsonResponse({
+                'success': False,
+                'error': error_msg
+            }, status=500)
+        else:
+            messages.error(request, error_msg)
+            return redirect('create_term')
+
+
+def extract_term_data(request):
+    """
+    Extract and clean term data from request
+    """
+    if request.content_type == 'application/json':
+        data = json.loads(request.body)
+    else:
+        data = request.POST
+    
+    return {
+        'name': data.get('name', '').strip(),
+        'academic_year_id': data.get('academic_year'),
+        'start_date': data.get('start_date'),
+        'end_date': data.get('end_date'),
+        'is_current': data.get('is_current') == 'true' or data.get('is_current') == 'on',
+    }
+
+
+def validate_term_data(term_data):
+    """
+    Validate required term data
+    """
+    errors = []
+    
+    if not term_data['name']:
+        errors.append("Term name is required.")
+    
+    if not term_data['academic_year_id']:
+        errors.append("Academic year is required.")
+    
+    if not term_data['start_date']:
+        errors.append("Start date is required.")
+    
+    if not term_data['end_date']:
+        errors.append("End date is required.")
+    
+    valid_terms = ['1st Term', '2nd Term', '3rd Term']
+    if term_data['name'] and term_data['name'] not in valid_terms:
+        errors.append(f"Term name must be one of: {', '.join(valid_terms)}")
+    
+    return errors
+
+
+def validate_date_ranges(term_data, academic_year):
+    """
+    Validate date ranges and relationships
+    """
+    errors = []
+    
+    try:
+        start_date = datetime.strptime(term_data['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(term_data['end_date'], '%Y-%m-%d').date()
+        
+        # Checking if start date is before end date
+        if start_date >= end_date:
+            errors.append("End date must be after start date.")
+        
+        # Checking if term dates are within academic year
+        if start_date < academic_year.start_date:
+            errors.append(f"Term start date cannot be before academic year start date ({academic_year.start_date}).")
+        
+        if end_date > academic_year.end_date:
+            errors.append(f"Term end date cannot be after academic year end date ({academic_year.end_date}).")
+        
+        # Checking if term duration is reasonable (at least 1 week)
+        term_duration = (end_date - start_date).days
+        if term_duration < 7:
+            errors.append("Term duration must be at least 1 week.")
+            
+        if term_duration > 365:
+            errors.append("Term duration cannot exceed 1 year.")
+            
+    except ValueError:
+        errors.append("Invalid date format. Please use YYYY-MM-DD format.")
+    
+    return errors
+
+
+def check_term_overlaps(term_data, academic_year):
+    """
+    Check for overlapping terms in the same academic year
+    """
+    errors = []
+    
+    try:
+        start_date = datetime.strptime(term_data['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(term_data['end_date'], '%Y-%m-%d').date()
+        
+        overlapping_terms = Term.objects.filter(
+            academic_year=academic_year
+        ).exclude(
+            name=term_data['name'] 
+        ).filter(
+            start_date__lte=end_date,
+            end_date__gte=start_date
+        )
+        
+        if overlapping_terms.exists():
+            overlapping_names = [term.name for term in overlapping_terms]
+            errors.append(
+                f"Term dates overlap with existing term(s): {', '.join(overlapping_names)}. "
+                f"Please adjust the dates."
+            )
+            
+    except ValueError:
+        pass
+    
+    return errors
+
+
+def create_term_instance(term_data, academic_year, user):
+    """
+    Create and save the term instance
+    """
+    term = Term(
+        name=term_data['name'],
+        academic_year=academic_year,
+        start_date=term_data['start_date'],
+        end_date=term_data['end_date'],
+        is_current=False
+    )
+    
+    term.save()
+    return term
+
+
+def set_current_term(new_current_term):
+    """
+    Set a term as current and unset any previous current term
+    """
+    Term.objects.filter(
+        academic_year=new_current_term.academic_year,
+        is_current=True
+    ).update(is_current=False)
+    
+    new_current_term.is_current = True
+    new_current_term.save()
+
+
+
+def error_response(request, error_message, is_ajax):
+    """
+    Return appropriate error response based on request type
+    """
+    if is_ajax:
+        return JsonResponse({
+            'success': False,
+            'error': error_message if isinstance(error_message, str) else ' '.join(error_message)
+        }, status=400)
+    else:
+        if isinstance(error_message, list):
+            error_message = ' '.join(error_message)
+        messages.error(request, error_message)
+        return redirect('create_term')
+
+
+@login_required
+def get_terms_by_academic_year(request):
+    """
+    API endpoint to get terms for a specific academic year
+    """
+    academic_year_id = request.GET.get('academic_year_id')
+    
+    if not academic_year_id:
+        return JsonResponse({
+            'success': False,
+            'error': 'Academic year ID is required'
+        }, status=400)
+    
+    try:
+        terms = Term.objects.filter(academic_year_id=academic_year_id).order_by('start_date')
+        
+        terms_data = []
+        for term in terms:
+            terms_data.append({
+                'id': term.id,
+                'name': term.name,
+                'start_date': term.start_date.strftime('%Y-%m-%d'),
+                'end_date': term.end_date.strftime('%Y-%m-%d'),
+                'is_current': term.is_current,
+                'academic_year_name': term.academic_year.name
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'terms': terms_data
+        })
+        
+    except AcademicYear.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Academic year not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)

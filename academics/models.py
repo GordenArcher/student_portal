@@ -214,6 +214,7 @@ class Result(models.Model):
         default=0,
         help_text="Exam score (e.g., 70%)"
     )
+
     score = models.DecimalField(
         max_digits=5, decimal_places=2,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
@@ -224,7 +225,8 @@ class Result(models.Model):
     grade = models.CharField(max_length=2, choices=GRADE_CHOICES, blank=True)
     grade_point = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     remarks = models.TextField(blank=True, null=True)
-    
+    use_system_calculation = models.BooleanField(default=True)
+
     is_published = models.BooleanField(default=False)
     published_date = models.DateTimeField(blank=True, null=True)
     uploaded_by = models.ForeignKey(
@@ -277,15 +279,17 @@ class Result(models.Model):
             return "F", 0.0
 
     def save(self, *args, **kwargs):
-        # Calculate total score as weighted sum (optional: 30% CA, 70% Exam)
-        if self.class_score is not None and self.exam_score is not None:
-            self.score = round((self.class_score * 0.3) + (self.exam_score * 0.7), 2)
+    # Only calculate score if system calculation is selected
+        if self.use_system_calculation:
+            if self.class_score is not None and self.exam_score is not None:
+                self.score = round((self.class_score * 0.3) + (self.exam_score * 0.7), 2)
 
         # Calculate grade and grade point
         if self.score is not None:
             self.grade, self.grade_point = self.calculate_grade()
-            
+                
         if self.is_published and not self.published_date:
             self.published_date = timezone.now()
-            
+                
         super().save(*args, **kwargs)
+

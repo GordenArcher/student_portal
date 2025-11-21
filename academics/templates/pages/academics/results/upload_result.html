@@ -28,36 +28,46 @@
         </div>
     </div>
 
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="upload-form">
-        <form id="uploadResultsForm">
+        <form method="POST" action="{% url 'upload_results' %}" id="uploadResultsForm">
             {% csrf_token %}
             
             <div class="form-section">
                 <h4>📝 Basic Information</h4>
                 <div class="filter-grid">
                     <div class="filter-group">
-                        <label>Academic Year </label>
-                        <select name="academic_year_id" class="form-control" required id="academicYearSelect">
+                        <label>Academic Year *</label>
+                        <select name="academic_year" class="form-control" required id="academicYearSelect">
                             <option value="">Select Academic Year</option>
-                            {% for year in context.academic_years %}
+                            {% for year in academic_years %}
                             <option value="{{ year.id }}">{{ year.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     
                     <div class="filter-group">
-                        <label>Term </label>
-                        <select name="term_id" class="form-control" required id="termSelect">
+                        <label>Term *</label>
+                        <select name="term" class="form-control" required id="termSelect">
                             <option value="">Select Term</option>
-                            <!-- Terms will be populated dynamically -->
                         </select>
                     </div>
                     
                     <div class="filter-group">
                         <label>Class Level *</label>
-                        <select name="class_level_id" class="form-control" required id="classLevelSelect">
+                        <select name="class_level" class="form-control" required id="classLevelSelect">
                             <option value="">Select Class</option>
-                            {% for class in context.class_levels %}
+                            {% for class in class_levels %}
                             <option value="{{ class.id }}">{{ class.name }}</option>
                             {% endfor %}
                         </select>
@@ -65,9 +75,9 @@
                     
                     <div class="filter-group">
                         <label>Subject *</label>
-                        <select name="subject_id" class="form-control" required id="subjectSelect">
+                        <select name="subject" class="form-control" required id="subjectSelect">
                             <option value="">Select Subject</option>
-                            {% for subject in context.subjects %}
+                            {% for subject in subjects %}
                             <option value="{{ subject.id }}">{{ subject.name }} ({{ subject.code }})</option>
                             {% endfor %}
                         </select>
@@ -78,9 +88,31 @@
             <div class="form-section">
                 <div class="form-section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h4>🎓 Student Results</h4>
-                    <button type="button" class="btn btn-outline" id="loadStudentsBtn" disabled>
-                        <i class="bi bi-arrow-clockwise"></i> Load Students
-                    </button>
+                    <div class="header-actions">
+                        <div class="form-check" style="display: inline-block; margin-right: 12px;">
+                            <input type="checkbox" name="is_published" id="isPublished" class="form-check-input">
+                            <label for="isPublished" class="form-check-label">Publish immediately</label>
+                        </div>
+                        <button type="button" class="btn btn-outline" id="loadStudentsBtn" disabled>
+                            <i class="bi bi-arrow-clockwise"></i> Load Students
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="calculation-mode-section" style="margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Calculation Mode:</label>
+                    <div class="radio-group" style="display: flex; gap: 16px;">
+                        <label class="radio-label">
+                            <input type="radio" name="calculation_mode" value="system" checked>
+                            <span class="radio-custom"></span>
+                            System Calculation (30% Class + 70% Exam)
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="calculation_mode" value="manual">
+                            <span class="radio-custom"></span>
+                            Manual Total Score
+                        </label>
+                    </div>
                 </div>
                 
                 <div id="studentsContainer">
@@ -90,6 +122,8 @@
                         <p>Select a class and subject to load students</p>
                     </div>
                 </div>
+
+                <div id="resultsDataContainer" style="display: none;"></div>
             </div>
 
             <div class="form-section">
@@ -106,6 +140,74 @@
     </div>
 </main>
 
+<!-- Student Result Modal -->
+<div id="studentResultModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalStudentName">Enter Student Results</h3>
+            <button type="button" class="btn-close" data-bs-dismiss="modal">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="studentResultForm">
+                <input type="hidden" id="modalStudentId" name="student_id">
+                
+                <div class="student-info-card" style="background: var(--bg-secondary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                    <div class="student-details">
+                        <div><strong>Student ID:</strong> <span id="modalStudentIdDisplay">-</span></div>
+                        <div><strong>Class:</strong> <span id="modalStudentClass">-</span></div>
+                    </div>
+                </div>
+
+                <div id="systemScoreInputs">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="modalClassScore">Class Score (30%) *</label>
+                            <input type="number" class="form-control" id="modalClassScore" name="class_score" 
+                                   min="0" max="100" step="0.1" placeholder="0-100" required>
+                            <small class="form-text">Continuous assessment score</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="modalExamScore">Exam Score (70%) *</label>
+                            <input type="number" class="form-control" id="modalExamScore" name="exam_score" 
+                                   min="0" max="100" step="0.1" placeholder="0-100" required>
+                            <small class="form-text">Final examination score</small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="modalTotalScore">Total Score (Calculated)</label>
+                        <input type="number" class="form-control" id="modalTotalScore" name="total_score" 
+                               readonly style="background: var(--bg-secondary);">
+                    </div>
+                </div>
+
+                <div id="manualScoreInputs" style="display: none;">
+                    <div class="form-group">
+                        <label for="modalManualScore">Total Score *</label>
+                        <input type="number" class="form-control" id="modalManualScore" name="manual_score" 
+                               min="0" max="100" step="0.1" placeholder="0-100">
+                        <small class="form-text">Enter the total score directly</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="modalRemarks">Remarks (Optional)</label>
+                    <textarea class="form-control" id="modalRemarks" name="remarks" 
+                              placeholder="Enter any remarks about this student's performance..." 
+                              rows="3" maxlength="200"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="saveStudentResultBtn">
+                <i class="bi bi-check-circle"></i> Save Results
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="loadingModal" class="confirmation-modal" style="display: none;">
     <div class="confirmation-content">
         <div class="confirmation-icon">
@@ -120,294 +222,6 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        initializeUploadForm();
-    });
-
-    function initializeUploadForm() {
-        const academicYearSelect = document.getElementById('academicYearSelect');
-        const termSelect = document.getElementById('termSelect');
-        const classLevelSelect = document.getElementById('classLevelSelect');
-        const subjectSelect = document.getElementById('subjectSelect');
-        const loadStudentsBtn = document.getElementById('loadStudentsBtn');
-        const submitBtn = document.getElementById('submitBtn');
-        const studentsContainer = document.getElementById('studentsContainer');
-
-        // Load terms when academic year is selected
-        academicYearSelect.addEventListener('change', function() {
-            const academicYearId = this.value;
-            loadTerms(academicYearId);
-        });
-
-        // Enable load students button when all required fields are filled
-        [classLevelSelect, subjectSelect, termSelect].forEach(select => {
-            select.addEventListener('change', validateForm);
-        });
-
-        // Load students when button is clicked
-        loadStudentsBtn.addEventListener('click', loadStudents);
-
-        // Handle form submission
-        document.getElementById('uploadResultsForm').addEventListener('submit', handleFormSubmit);
-    }
-
-    async function loadTerms(academicYearId) {
-        const termSelect = document.getElementById('termSelect');
-        
-        if (!academicYearId) {
-            termSelect.innerHTML = '<option value="">Select Term</option>';
-            return;
-        }
-
-        try {
-            const response = await fetch(`/academics/api/terms/?academic_year=${academicYearId}`);
-            const data = await response.json();
-
-            termSelect.innerHTML = '<option value="">Select Term</option>';
-            
-            if (data.success && data.terms) {
-                data.terms.forEach(term => {
-                    const option = document.createElement('option');
-                    option.value = term.id;
-                    option.textContent = `${term.name} (${term.start_date} - ${term.end_date})`;
-                    termSelect.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Error loading terms:', error);
-            showToast('Error loading terms', 'error');
-        }
-    }
-
-    function validateForm() {
-        const classLevelSelect = document.getElementById('classLevelSelect');
-        const subjectSelect = document.getElementById('subjectSelect');
-        const termSelect = document.getElementById('termSelect');
-        const loadStudentsBtn = document.getElementById('loadStudentsBtn');
-
-        const isFormValid = classLevelSelect.value && subjectSelect.value && termSelect.value;
-        
-        loadStudentsBtn.disabled = !isFormValid;
-        return isFormValid;
-    }
-
-    async function loadStudents() {
-        if (!validateForm()) {
-            showToast('Please fill all required fields', 'warning');
-            return;
-        }
-
-        const classLevelId = document.getElementById('classLevelSelect').value;
-        const academicYearId = document.getElementById('academicYearSelect').value;
-        const studentsContainer = document.getElementById('studentsContainer');
-        const loadStudentsBtn = document.getElementById('loadStudentsBtn');
-
-        try {
-            loadStudentsBtn.innerHTML = '<span class="loading-spinner"></span> Loading...';
-            loadStudentsBtn.disabled = true;
-
-            const response = await fetch(`/academics/api/results/students/?class_level_id=${classLevelId}&academic_year_id=${academicYearId}`);
-            const data = await response.json();
-
-            if (data.success) {
-                displayStudents(data.students);
-                loadExistingResults();
-            } else {
-                showToast(data.error || 'Error loading students', 'error');
-            }
-        } catch (error) {
-            console.error('Error loading students:', error);
-            showToast('Error loading students', 'error');
-        } finally {
-            loadStudentsBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Load Students';
-            loadStudentsBtn.disabled = false;
-        }
-    }
-
-    function displayStudents(students) {
-        const studentsContainer = document.getElementById('studentsContainer');
-        const submitBtn = document.getElementById('submitBtn');
-
-        if (students.length === 0) {
-            studentsContainer.innerHTML = `
-                <div class="empty-state">
-                    <i class="bi bi-people"></i>
-                    <h4>No Students Found</h4>
-                    <p>No active students found in the selected class</p>
-                </div>
-            `;
-            submitBtn.disabled = true;
-            return;
-        }
-
-        let html = `
-            <div class="students-grid">
-                <div class="student-score-item" style="background: var(--bg-primary); font-weight: 600;">
-                    <div class="student-info-compact">
-                        <span>Student Name & ID</span>
-                    </div>
-                    <div style="text-align: center;">Score (%)</div>
-                </div>
-        `;
-
-        students.forEach(student => {
-            html += `
-                <div class="student-score-item" data-student-id="${student.id}">
-                    <div class="student-info-compact">
-                        <span class="student-name">${student.first_name} ${student.last_name}</span>
-                        <span class="student-id">${student.student_profile__student_id}</span>
-                    </div>
-                    <div>
-                        <input type="number" 
-                               class="score-input" 
-                               name="score_${student.id}" 
-                               min="0" 
-                               max="100" 
-                               step="0.1"
-                               placeholder="Enter score"
-                               data-student-id="${student.id}">
-                    </div>
-                </div>
-            `;
-        });
-
-        html += '</div>';
-        studentsContainer.innerHTML = html;
-        submitBtn.disabled = false;
-
-        // Add input validation
-        document.querySelectorAll('.score-input').forEach(input => {
-            input.addEventListener('input', validateScoreInput);
-        });
-    }
-
-    async function loadExistingResults() {
-        const classLevelId = document.getElementById('classLevelSelect').value;
-        const subjectId = document.getElementById('subjectSelect').value;
-        const termId = document.getElementById('termSelect').value;
-
-        if (!classLevelId || !subjectId || !termId) return;
-
-        try {
-            const response = await fetch(`/academics/api/results/existing/?class_level_id=${classLevelId}&subject_id=${subjectId}&term_id=${termId}`);
-            const data = await response.json();
-
-            if (data.success && data.results) {
-                // Pre-fill existing results
-                Object.keys(data.results).forEach(studentId => {
-                    const result = data.results[studentId];
-                    const input = document.querySelector(`input[data-student-id="${studentId}"]`);
-                    if (input) {
-                        input.value = result.score;
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Error loading existing results:', error);
-        }
-    }
-
-    function validateScoreInput(e) {
-        const input = e.target;
-        const value = parseFloat(input.value);
-        
-        input.classList.remove('error');
-        
-        if (input.value && (isNaN(value) || value < 0 || value > 100)) {
-            input.classList.add('error');
-            showToast('Score must be between 0 and 100', 'warning');
-        }
-    }
-
-    async function handleFormSubmit(e) {
-        e.preventDefault();
-        
-        const classLevelId = document.getElementById('classLevelSelect').value;
-        const subjectId = document.getElementById('subjectSelect').value;
-        const termId = document.getElementById('termSelect').value;
-        const academicYearId = document.getElementById('academicYearSelect').value;
-
-        // Collect results data
-        const results = [];
-        const scoreInputs = document.querySelectorAll('.score-input');
-        
-        let hasErrors = false;
-        scoreInputs.forEach(input => {
-            if (input.value) {
-                const value = parseFloat(input.value);
-                if (isNaN(value) || value < 0 || value > 100) {
-                    input.classList.add('error');
-                    hasErrors = true;
-                } else {
-                    results.push({
-                        student_id: input.getAttribute('data-student-id'),
-                        score: value
-                    });
-                }
-            }
-        });
-
-        if (hasErrors) {
-            showToast('Please fix invalid scores before submitting', 'error');
-            return;
-        }
-
-        if (results.length === 0) {
-            showToast('Please enter at least one score', 'warning');
-            return;
-        }
-
-        // Show loading modal
-        const loadingModal = document.getElementById('loadingModal');
-        const loadingMessage = document.getElementById('loadingMessage');
-        loadingMessage.textContent = `Uploading ${results.length} results...`;
-        loadingModal.style.display = 'flex';
-
-        try {
-            const response = await fetch('/academics/results/upload/', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    class_level_id: classLevelId,
-                    subject_id: subjectId,
-                    term_id: termId,
-                    academic_year_id: academicYearId,
-                    results: results
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast(data.message, 'success');
-                setTimeout(() => {
-                    window.location.href = '{% url "results_dashboard" %}';
-                }, 2000);
-            } else {
-                showToast(data.error || 'Failed to upload results', 'error');
-            }
-        } catch (error) {
-            console.error('Error uploading results:', error);
-            showToast('Error uploading results', 'error');
-        } finally {
-            loadingModal.style.display = 'none';
-        }
-    }
-
-    // Utility function to show toast notifications
-    function showToast(message, type = 'info') {
-        // Use your existing toast implementation
-        if (typeof window.showToast === 'function') {
-            window.showToast(message, type);
-        } else {
-            alert(`${type.toUpperCase()}: ${message}`);
-        }
-    }
-</script>
+{% block js %}
+    <script type="module" src="{% static 'scripts/JS/upload_result.js' %}"></script>
 {% endblock %}

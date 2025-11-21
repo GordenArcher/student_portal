@@ -3,6 +3,10 @@
 
 {% block title %}My Classes - Teacher Portal{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'styles/pages/my_classes.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="main-content">
     <div class="content-header">
@@ -13,15 +17,15 @@
     </div>
 
     <div class="classes-grid">
-        {% for class in classes_taught %}
+        {% for class_data in classes_taught %}
         <div class="class-card">
             <div class="class-header">
                 <div class="class-icon">
                     <i class="bi bi-building"></i>
                 </div>
                 <div class="class-info">
-                    <h3>{{ class.name }}</h3>
-                    <span class="class-code">{{ class.code }}</span>
+                    <h3>{{ class_data.name }}</h3>
+                    <span class="class-code">{{ class_data.code|default:class_data.name }}</span>
                 </div>
             </div>
             
@@ -29,15 +33,15 @@
                 <div class="stat">
                     <i class="bi bi-book"></i>
                     <div>
-                        <strong>{{ class.subject_count }}</strong>
-                        <span>Subject{{ class.subject_count|pluralize }}</span>
+                        <strong>{{ class_data.subject_count }}</strong>
+                        <span>Subject{{ class_data.subject_count|pluralize }}</span>
                     </div>
                 </div>
                 <div class="stat">
                     <i class="bi bi-people"></i>
                     <div>
-                        <strong>{{ class.student_count }}</strong>
-                        <span>Student{{ class.student_count|pluralize }}</span>
+                        <strong>{{ class_data.student_count }}</strong>
+                        <span>Student{{ class_data.student_count|pluralize }}</span>
                     </div>
                 </div>
             </div>
@@ -45,23 +49,19 @@
             <div class="class-subjects">
                 <h4>Subjects Teaching:</h4>
                 <div class="subjects-list">
-                    {{class }}
-                    {% for subject in class.subjects.all %}
-                    {{ subject }}
-                        {% if subject.teacher == teacher %}
-                        <span class="subject-tag">{{ subject }}</span>
-                        {% endif %}
+                    {% for subject in class_data.subjects.all %}
+                    <span class="subject-tag">{{ subject.name }}</span>
                     {% empty %}
-                        <span class="no-subjects">No subjects assigned</span>
+                    <span class="no-subjects">No subjects assigned</span>
                     {% endfor %}
                 </div>
             </div>
             
             <div class="class-actions">
-                <a href="{% url 'my_students' %}?class={{ class.id }}" class="btn btn-primary btn-sm">
+                <a href="{% url 'my_students' %}?class={{ class_data.id }}" class="btn btn-primary btn-sm">
                     <i class="bi bi-people"></i> View Students
                 </a>
-                <a href="{% url 'manage_results' %}?class_level={{ class.id }}" class="btn btn-outline-primary btn-sm">
+                <a href="{% url 'manage_results' %}?class_level={{ class_data.id }}" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-journal-text"></i> Manage Results
                 </a>
             </div>

@@ -30,7 +30,8 @@ urlpatterns = [
 
 
     path('results/', views.results_dashboard, name='results_dashboard'),
-    path('results/upload/', views.upload_results, name='upload_results'),
+    path('results/upload/', views.upload_results_form, name='upload_results'),
+    path('results/upload/result/new/', views.upload_results_submit, name='upload_results_form'),
     path('results/analysis/', views.results_analysis, name='results_analysis'),
     path('results/<uuid:result_id>/', views.result_detail, name='result_detail'),
     path('results/<uuid:result_id>/publish/', views.publish_results, name='publish_result'),
@@ -40,4 +41,11 @@ urlpatterns = [
     path('api/results/publish-bulk/', views.publish_results, name='publish_results_bulk'),
     path('api/terms/', views.get_terms_for_academic_year, name='get_terms_for_academic_year'),
     path('results/analysis/export/', views.export_analysis_report, name='export_analysis_report'),
+    path("terms/all", views.terms_list, name="terms_list"),
+    path('terms/create/', views.create_term, name='create_term'),
+    path('api/terms/by-academic-year/', views.get_terms_by_academic_year, name='get_terms_by_academic_year'),
+    path('api/terms/', views.api_terms_list, name='api_terms_list'),
+    path('api/terms/update/', views.api_update_term, name='api_update_term'),
+    path('api/terms/delete/', views.api_delete_term, name='api_delete_term'),
+    path('api/terms/set-current/', views.api_set_current_term, name='api_set_current_term'),
 ]
