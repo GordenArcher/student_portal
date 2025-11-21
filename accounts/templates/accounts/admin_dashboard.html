@@ -178,18 +178,14 @@
         </div>
 
         <div class="quick-actions-grid">
-            <a class="action-card">
+            <a href="{% url 'student_create' %}" class="action-card">
                 <div class="action-icon">➕</div>
                 <div class="action-label">Add Student</div>
             </a>
-            <a class="action-card">
+            <a href="{% url 'teacher_create' %}" class="action-card">
                 <div class="action-icon">👨‍🏫</div>
                 <div class="action-label">Add Teacher</div>
             </a>
-            <div class="action-card">
-                <div class="action-icon">📝</div>
-                <div class="action-label">Upload Results</div>
-            </div>
             <a href="{% url 'create_academic_year' %}" class="action-card">
                 <div class="action-icon">📊</div>
                 <div class="action-label">Add year</div>
@@ -199,21 +195,17 @@
                 <div class="action-icon">📅</div>
                 <div class="action-label">Add Term</div>
             </a>
-            <div class="action-card">
-                <div class="action-icon">📢</div>
-                <div class="action-label">Send Notice</div>
-            </div>
         </div>
 
         <div class="charts-grid">
             <div class="chart-card large">
                 <div class="chart-header">
                     <h3>Student Performance Trends</h3>
-                    <div class="chart-filter">
+                    <!-- <div class="chart-filter">
                         <button class="filter-btn active">This Year</button>
                         <button class="filter-btn">Last Year</button>
                         <button class="filter-btn">All Time</button>
-                    </div>
+                    </div> -->
                 </div>
                 <div class="chart-container">
                     {% if context.avg_score > 0 %}
@@ -547,7 +539,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-  // Class Distribution Chart - Using class_distribution from context
 {% if context.class_distribution %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {

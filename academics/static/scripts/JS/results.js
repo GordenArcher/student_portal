@@ -162,11 +162,9 @@ async function deleteResult(resultId, row) {
 function initializeFilters() {
     const filterForm = document.querySelector('.filters-form');
     if (filterForm) {
-        // Add real-time filtering if needed
         const inputs = filterForm.querySelectorAll('select, input');
         inputs.forEach(input => {
             input.addEventListener('change', function() {
-                // Add debouncing for performance
                 clearTimeout(window.filterTimeout);
                 window.filterTimeout = setTimeout(() => {
                     filterForm.submit();
@@ -176,7 +174,6 @@ function initializeFilters() {
     }
 }
 
-// Score input validation
 function initializeScoreInputs() {
     document.addEventListener('input', function(e) {
         if (e.target.classList.contains('score-input')) {
@@ -203,7 +200,6 @@ function validateScoreInput(input) {
     return true;
 }
 
-// Bulk operations
 function selectAllResults(checkbox) {
     const checkboxes = document.querySelectorAll('.result-checkbox');
     checkboxes.forEach(cb => {
@@ -250,7 +246,6 @@ async function bulkPublishResults(publish = true) {
     }
 }
 
-// Export functionality
 function exportResults(format = 'csv') {
     const filters = getCurrentFilters();
     
@@ -332,7 +327,6 @@ function initializeAnalysisCharts() {
         });
     }
     
-    // Subject performance chart
     const subjectCtx = document.getElementById('subjectPerformanceChart');
     if (subjectCtx) {
         new Chart(subjectCtx, {
@@ -367,7 +361,6 @@ function initializeAnalysisCharts() {
 }
 
 
-// Initialize specific pages
 if (document.querySelector('.results-dashboard')) {
     initializeResultsPage();
 }

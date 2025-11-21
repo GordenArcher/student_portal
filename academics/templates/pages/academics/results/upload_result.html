@@ -48,34 +48,41 @@
                 <div class="filter-grid">
                     <div class="filter-group">
                         <label>Academic Year *</label>
-                        <select name="academic_year" class="form-control" required id="academicYearSelect">
+                        <select title="select academic year" name="academic_year" class="form-control" required id="academicYearSelect">
                             <option value="">Select Academic Year</option>
                             {% for year in academic_years %}
-                            <option value="{{ year.id }}">{{ year.name }}</option>
+                            <option value="{{ year.id }}">
+                                {{ year.name }}
+
+                                {% if year.is_current%}
+                                    ( Current Year )
+                                  
+                                {% endif %}
+                            </option>
                             {% endfor %}
                         </select>
                     </div>
                     
                     <div class="filter-group">
                         <label>Term *</label>
-                        <select name="term" class="form-control" required id="termSelect">
+                        <select title="select term" name="term" class="form-control" required id="termSelect">
                             <option value="">Select Term</option>
                         </select>
                     </div>
                     
                     <div class="filter-group">
                         <label>Class Level *</label>
-                        <select name="class_level" class="form-control" required id="classLevelSelect">
+                        <select title="select class" name="class_level" class="form-control" required id="classLevelSelect">
                             <option value="">Select Class</option>
                             {% for class in class_levels %}
-                            <option value="{{ class.id }}">{{ class.name }}</option>
+                                <option value="{{ class.id }}">{{ class.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     
                     <div class="filter-group">
                         <label>Subject *</label>
-                        <select name="subject" class="form-control" required id="subjectSelect">
+                        <select title="select subject" name="subject" class="form-control" required id="subjectSelect">
                             <option value="">Select Subject</option>
                             {% for subject in subjects %}
                             <option value="{{ subject.id }}">{{ subject.name }} ({{ subject.code }})</option>
@@ -96,22 +103,6 @@
                         <button type="button" class="btn btn-outline" id="loadStudentsBtn" disabled>
                             <i class="bi bi-arrow-clockwise"></i> Load Students
                         </button>
-                    </div>
-                </div>
-                
-                <div class="calculation-mode-section" style="margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
-                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Calculation Mode:</label>
-                    <div class="radio-group" style="display: flex; gap: 16px;">
-                        <label class="radio-label">
-                            <input type="radio" name="calculation_mode" value="system" checked>
-                            <span class="radio-custom"></span>
-                            System Calculation (30% Class + 70% Exam)
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="calculation_mode" value="manual">
-                            <span class="radio-custom"></span>
-                            Manual Total Score
-                        </label>
                     </div>
                 </div>
                 
@@ -140,15 +131,31 @@
     </div>
 </main>
 
-<!-- Student Result Modal -->
 <div id="studentResultModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
             <h3 id="modalStudentName">Enter Student Results</h3>
-            <button type="button" class="btn-close" data-bs-dismiss="modal">
+            <button title="close model" type="button" class="btn-close cls_stu_m" data-bs-dismiss="modal">
                 <i class="bi bi-x"></i>
             </button>
         </div>
+
+        <div class="calculation-mode-section" style="margin-bottom: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px;">
+            <label style="font-weight: 600; margin-bottom: 8px; display: block;">Calculation Mode:</label>
+            <div class="radio-group" style="display: flex; gap: 16px;">
+                <label class="radio-label">
+                    <input type="radio" name="calculation_mode" value="system" checked>
+                    <span class="radio-custom"></span>
+                    System 
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="calculation_mode" value="manual">
+                    <span class="radio-custom"></span>
+                    Manual
+                </label>
+            </div>
+        </div>
+
         <div class="modal-body">
             <form id="studentResultForm">
                 <input type="hidden" id="modalStudentId" name="student_id">
@@ -160,7 +167,7 @@
                     </div>
                 </div>
 
-                <div id="systemScoreInputs">
+                <div>
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="modalClassScore">Class Score (30%) *</label>
@@ -175,6 +182,9 @@
                             <small class="form-text">Final examination score</small>
                         </div>
                     </div>
+                </div>
+
+                <div id="systemScoreInputs">
                     <div class="form-group">
                         <label for="modalTotalScore">Total Score (Calculated)</label>
                         <input type="number" class="form-control" id="modalTotalScore" name="total_score" 
@@ -200,7 +210,7 @@
             </form>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-secondary cls_stu_m" data-bs-dismiss="modal">Cancel</button>
             <button type="button" class="btn btn-primary" id="saveStudentResultBtn">
                 <i class="bi bi-check-circle"></i> Save Results
             </button>

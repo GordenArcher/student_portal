@@ -80,6 +80,9 @@
                         {% for year in context.academic_years %}
                         <option value="{{ year.id }}" {% if context.current_filters.academic_year_id == year.id|stringformat:"s" %}selected{% endif %}>
                             {{ year.name }}
+                            {% if year.is_current %}
+                                (Current Year)
+                            {% endif %}
                         </option>
                         {% endfor %}
                     </select>
@@ -87,7 +90,7 @@
                 
                 <div class="filter-group">
                     <label>Class Level</label>
-                    <select name="class_level" class="form-control">
+                    <select title="select" name="class_level" class="form-control">
                         <option value="">All Classes</option>
                         {% for class in context.class_levels %}
                         <option value="{{ class.id }}" {% if context.current_filters.class_level_id == class.id|stringformat:"s" %}selected{% endif %}>
@@ -99,11 +102,14 @@
                 
                 <div class="filter-group">
                     <label>Term</label>
-                    <select name="term" class="form-control">
+                    <select title="select name="term" class="form-control">
                         <option value="">All Terms</option>
                         {% for term in context.terms %}
                         <option value="{{ term.id }}" {% if context.current_filters.term_id == term.id|stringformat:"s" %}selected{% endif %}>
                             {{ term.name }}
+                            {% if term.is_current %}
+                                (Current Term)
+                            {% endif %}
                         </option>
                         {% endfor %}
                     </select>
@@ -111,7 +117,7 @@
                 
                 <div class="filter-group">
                     <label>Subject</label>
-                    <select name="subject" class="form-control">
+                    <select title="select subject name="subject" class="form-control">
                         <option value="">All Subjects</option>
                         {% for subject in context.subjects %}
                         <option value="{{ subject.id }}" {% if context.current_filters.subject_id == subject.id|stringformat:"s" %}selected{% endif %}>
@@ -135,7 +141,6 @@
     </div>
 
     <div class="content-grid">
-        <!-- Recent Results -->
         <div class="card">
             <div class="card-header">
                 <h3>Recent Results</h3>
@@ -188,17 +193,12 @@
                                         <a href="{% url 'result_detail' result.id %}" class="btn btn-sm btn-outline">
                                             <i class="bi bi-eye"></i>
                                         </a>
-                                        <button class="btn btn-sm btn-outline publish-btn" 
+                                        <button title="publish" class="btn btn-sm btn-outline publish-btn" 
                                                 data-result-id="{{ result.id }}"
                                                 data-action="{% if result.is_published %}unpublish{% else %}publish{% endif %}">
                                             <i class="bi bi-{% if result.is_published %}eye-slash{% else %}eye{% endif %}"></i>
                                         </button>
-                                        {% if request.user.role == 'admin' or result.uploaded_by == request.user %}
-                                        <button class="btn btn-sm btn-outline-danger delete-btn" 
-                                                data-result-id="{{ result.id }}">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                        {% endif %}
+                                        
                                     </div>
                                 </td>
                             </tr>

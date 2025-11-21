@@ -626,6 +626,83 @@ def academic_years_list(request):
     })
 
 
+@require_http_methods(["PUT"])
+def edit_academic_year(request, year_id):
+    """Edit an academic year"""
+    try:
+        academic_year = get_object_or_404(AcademicYear, id=year_id)
+        data = json.loads(request.body)
+        
+        academic_year.name = data.get('name', academic_year.name)
+        academic_year.start_date = data.get('start_date', academic_year.start_date)
+        academic_year.end_date = data.get('end_date', academic_year.end_date)
+        academic_year.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Academic year updated successfully',
+            'academic_year': {
+                'id': academic_year.id,
+                'name': academic_year.name,
+                'start_date': academic_year.start_date,
+                'end_date': academic_year.end_date,
+                'is_current': academic_year.is_current
+            }
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["POST"])
+def set_current_academic_year(request, year_id):
+    """Set an academic year as current"""
+    try:
+        academic_year = get_object_or_404(AcademicYear, id=year_id)
+        academic_year.is_current = True
+        academic_year.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{academic_year.name} set as current academic year'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@require_http_methods(["DELETE"])
+def delete_academic_year(request, year_id):
+    """Delete an academic year"""
+    try:
+        academic_year = get_object_or_404(AcademicYear, id=year_id)
+        
+        if academic_year.is_current:
+            return JsonResponse({
+                'success': False,
+                'error': 'Cannot delete the current academic year'
+            }, status=400)
+        
+        academic_year_name = academic_year.name
+        academic_year.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Academic year {academic_year_name} deleted successfully'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+    
+
+
+
 @login_required
 @require_http_methods(["POST"])
 @transaction.atomic
@@ -1204,7 +1281,6 @@ def upload_results_submit(request):
         class_level = get_object_or_404(ClassLevel, id=class_level_id)
         subject = get_object_or_404(Subject, id=subject_id)
         term = get_object_or_404(Term, id=term_id)
-        academic_year = get_object_or_404(AcademicYear, id=academic_year_id)
 
         if student.student_profile.current_class != class_level:
             return JsonResponse({
@@ -1343,11 +1419,14 @@ def get_existing_results(request):
     ).select_related('student').values(
         'student_id',
         'score',
+        'class_score',
+        'exam_score',
         'grade',
         'is_published'
     )
     
-    results_dict = {result['student_id']: result for result in results}
+    results_dict = {str(result['student_id']): result for result in results}
+
     
     return JsonResponse({
         'success': True,

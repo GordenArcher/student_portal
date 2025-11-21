@@ -19,7 +19,6 @@ function initializeUploadForm() {
     const loadStudentsBtn = document.getElementById('loadStudentsBtn');
     const calculationModeRadios = document.querySelectorAll('input[name="calculation_mode"]');
 
-    // Load terms when academic year is selected
     academicYearSelect.addEventListener('change', function() {
         const academicYearId = this.value;
         loadTerms(academicYearId);
@@ -35,29 +34,28 @@ function initializeUploadForm() {
         radio.addEventListener('change', toggleCalculationMode);
     });
 
-    // Modal event listeners
     initializeModalEvents();
 
-    // Updated form submit to handle batch submission
     document.getElementById('uploadResultsForm').addEventListener('submit', handleFormSubmit);
 }
 
 function initializeModalEvents() {
-    // Save student result button
     document.getElementById('saveStudentResultBtn').addEventListener('click', saveStudentResult);
     
-    // Just validate inputs instead
     document.getElementById('modalClassScore').addEventListener('input', validateScoreInput);
     document.getElementById('modalExamScore').addEventListener('input', validateScoreInput);
     document.getElementById('modalManualScore').addEventListener('input', validateScoreInput);
     
-    // Close modal when clicking outside
     document.getElementById('studentResultModal').addEventListener('click', function(e) {
         if (e.target === this) {
             hideStudentModal();
         }
     });
 }
+
+document.querySelector(".cls_stu_m").addEventListener("click", () => {
+    hideStudentModal()
+})
 
 function validateScoreInput(e) {
     const value = parseFloat(e.target.value);
@@ -206,7 +204,7 @@ function displayStudents(students) {
                     ${hasResult ? `<div class="score-preview">Class: ${resultsData[student.id].class_score || 'N/A'}, Exam: ${resultsData[student.id].exam_score || 'N/A'}</div>` : ''}
                 </div>
                 <div class="student-actions">
-                    <button class="btn btn-sm btn-primary enter-result-btn" data-student-id="${student.id}">
+                    <button type="button" class="btn btn-sm btn-primary enter-result-btn" data-student-id="${student.id}">
                         <i class="bi bi-pencil-square"></i> ${hasResult ? 'Edit Result' : 'Enter Result'}
                     </button>
                 </div>
@@ -218,12 +216,10 @@ function displayStudents(students) {
     studentsContainer.innerHTML = html;
     submitBtn.disabled = false;
 
-    // Add event listeners to student items
     attachStudentEventListeners();
 }
 
 function attachStudentEventListeners() {
-    // Enter result buttons
     document.querySelectorAll('.enter-result-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const studentId = this.getAttribute('data-student-id');
@@ -231,7 +227,6 @@ function attachStudentEventListeners() {
         });
     });
 
-    // Make entire student item clickable (optional)
     document.querySelectorAll('.student-item').forEach(item => {
         item.addEventListener('click', function(e) {
             if (!e.target.closest('.student-actions')) {
@@ -246,7 +241,6 @@ function openStudentModal(studentId) {
     const student = currentStudents.find(s => s.id == studentId);
     if (!student) return;
 
-    // Populate modal with student info
     document.getElementById('modalStudentName').textContent = `Enter Results for ${student.first_name} ${student.last_name}`;
     document.getElementById('modalStudentId').value = studentId;
     document.getElementById('modalStudentIdDisplay').textContent = student.student_profile__student_id || student.username;
@@ -254,29 +248,25 @@ function openStudentModal(studentId) {
     const classLevelName = document.getElementById('classLevelSelect').options[document.getElementById('classLevelSelect').selectedIndex].text;
     document.getElementById('modalStudentClass').textContent = classLevelName;
 
-    // Load existing result data if any
     const existingResult = resultsData[studentId];
     if (existingResult) {
-        document.getElementById('modalClassScore').value = existingResult.class_score || '';
-        document.getElementById('modalExamScore').value = existingResult.exam_score || '';
-        document.getElementById('modalManualScore').value = existingResult.score || '';
-        document.getElementById('modalRemarks').value = existingResult.remarks || '';
-        
-        // Set calculation mode
+        document.getElementById('modalClassScore').value = existingResult.class_score ?? '';
+        document.getElementById('modalExamScore').value = existingResult.exam_score ?? '';
+        document.getElementById('modalManualScore').value = existingResult.score ?? '';
+        document.getElementById('modalRemarks').value = existingResult.remarks ?? '';
+
         const calcMode = existingResult.calculation_mode || 'system';
         document.querySelector(`input[name="calculation_mode"][value="${calcMode}"]`).checked = true;
+
         toggleCalculationMode();
     } else {
-        // Clear form
         document.getElementById('studentResultForm').reset();
-        document.querySelector('input[name="calculation_mode"][value="system"]').checked = true;
+        document.querySelector(`input[name="calculation_mode"][value="system"]`).checked = true;
         toggleCalculationMode();
     }
 
-    // Show modal
     document.getElementById('studentResultModal').style.display = 'flex';
     
-    // Focus on first input
     setTimeout(() => {
         const firstInput = document.querySelector('#studentResultForm input:not([type="hidden"]):not([type="radio"])');
         if (firstInput) firstInput.focus();
@@ -287,17 +277,23 @@ function hideStudentModal() {
     document.getElementById('studentResultModal').style.display = 'none';
 }
 
-function saveStudentResult() {
+async function saveStudentResult() {
     const studentId = document.getElementById('modalStudentId').value;
     const calculationMode = document.querySelector('input[name="calculation_mode"]:checked').value;
     
-    let resultData = {
-        student_id: studentId,
-        remarks: document.getElementById('modalRemarks').value,
-        calculation_mode: calculationMode
-    };
+    const formData = new FormData();
+    formData.append('student', studentId);
+    formData.append('class_level', document.getElementById('classLevelSelect').value);
+    formData.append('subject', document.getElementById('subjectSelect').value);
+    formData.append('term', document.getElementById('termSelect').value);
+    formData.append('academic_year', document.getElementById('academicYearSelect').value);
+    formData.append('calculation_mode', calculationMode);
+    formData.append('remarks', document.getElementById('modalRemarks').value);
+    
+    if (document.getElementById('isPublished').checked) {
+        formData.append('is_published', 'on');
+    }
 
-    // Validate based on calculation mode
     if (calculationMode === 'system') {
         const classScore = document.getElementById('modalClassScore').value;
         const examScore = document.getElementById('modalExamScore').value;
@@ -315,39 +311,72 @@ function saveStudentResult() {
             return;
         }
         
-        resultData.class_score = classScoreVal;
-        resultData.exam_score = examScoreVal;
+        formData.append('class_score', classScoreVal);
+        formData.append('exam_score', examScoreVal);
     } else {
         const manualScore = document.getElementById('modalManualScore').value;
+        const classScore = document.getElementById('modalClassScore').value;
+        const examScore = document.getElementById('modalExamScore').value;
         
         if (!manualScore) {
-            showToast('Please enter the total score', 'error');
+            showToast('Please enter total score', 'error');
             return;
         }
         
         const manualScoreVal = parseFloat(manualScore);
+        const classScoreVal = parseFloat(classScore || 0);
+        const examScoreVal = parseFloat(examScore || 0);
         
         if (manualScoreVal < 0 || manualScoreVal > 100) {
-            showToast('Score must be between 0 and 100', 'error');
+            showToast('Total score must be between 0 and 100', 'error');
             return;
         }
         
-        resultData.score = manualScoreVal;
-        resultData.class_score = 0;
-        resultData.exam_score = 0;
+        formData.append('score', manualScoreVal);
+        formData.append('class_score', classScoreVal);
+        formData.append('exam_score', examScoreVal);
     }
 
-    // Save to results data
-    resultsData[studentId] = resultData;
-    
-    // Update UI
-    updateStudentStatus(studentId);
-    
-    showToast('Result saved successfully. Click "Upload Results" to submit.', 'success');
-    hideStudentModal();
-    
-    // Enable submit button if we have at least one result
-    document.getElementById('submitBtn').disabled = Object.keys(resultsData).length === 0;
+    try {
+        const saveBtn = document.getElementById('saveStudentResultBtn');
+        saveBtn.innerHTML = '<span class="loading-spinner"></span> Saving...';
+        saveBtn.disabled = true;
+
+        const response = await fetch('/academics/results/upload/result/new/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCsrfToken()
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showToast('Result saved successfully', 'success');
+            hideStudentModal();
+            
+            // Update the resultsData and UI
+            resultsData[studentId] = {
+                calculation_mode: calculationMode,
+                class_score: document.getElementById('modalClassScore').value,
+                exam_score: document.getElementById('modalExamScore').value,
+                score: document.getElementById('modalManualScore').value,
+                remarks: document.getElementById('modalRemarks').value
+            };
+            
+            updateStudentStatus(studentId);
+        } else {
+            showToast(data.error || 'Error saving result', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving result:', error);
+        showToast('Error saving result', 'error');
+    } finally {
+        const saveBtn = document.getElementById('saveStudentResultBtn');
+        saveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Save Results';
+        saveBtn.disabled = false;
+    }
 }
 
 function updateStudentStatus(studentId) {
@@ -367,7 +396,6 @@ function updateStudentStatus(studentId) {
             <div class="score-preview">${scoreDisplay}</div>
         `;
         
-        // Update button text
         const actionsElement = studentItem.querySelector('.student-actions');
         const button = actionsElement.querySelector('.enter-result-btn');
         button.innerHTML = '<i class="bi bi-pencil"></i> Edit Result';
@@ -388,12 +416,10 @@ async function loadExistingResults() {
         if (data.success && data.results) {
             resultsData = data.results;
             
-            // Update UI for students with existing results
             Object.keys(resultsData).forEach(studentId => {
                 updateStudentStatus(studentId);
             });
             
-            // Enable submit button if we have results
             document.getElementById('submitBtn').disabled = Object.keys(resultsData).length === 0;
         }
     } catch (error) {
@@ -401,98 +427,7 @@ async function loadExistingResults() {
     }
 }
 
-async function handleFormSubmit(e) {
+function handleFormSubmit(e) {
     e.preventDefault();
-    
-    if (Object.keys(resultsData).length === 0) {
-        showToast('Please enter results for at least one student', 'error');
-        return;
-    }
-
-    // Get form data
-    const classLevelId = document.getElementById('classLevelSelect').value;
-    const subjectId = document.getElementById('subjectSelect').value;
-    const termId = document.getElementById('termSelect').value;
-    const academicYearId = document.getElementById('academicYearSelect').value;
-    const isPublished = document.getElementById('isPublished').checked;
-
-    // Show loading modal
-    const loadingModal = document.getElementById('loadingModal');
-    loadingModal.style.display = 'flex';
-
-    let successCount = 0;
-    let errorCount = 0;
-    const errors = [];
-
-    // Submit each student's result individually
-    for (const [studentId, resultData] of Object.entries(resultsData)) {
-        try {
-            const formData = new FormData();
-            formData.append('student', studentId);
-            formData.append('class_level', classLevelId);
-            formData.append('subject', subjectId);
-            formData.append('term', termId);
-            formData.append('academic_year', academicYearId);
-            formData.append('calculation_mode', resultData.calculation_mode);
-            formData.append('remarks', resultData.remarks || '');
-            
-            if (isPublished) {
-                formData.append('is_published', 'on');
-            }
-
-            if (resultData.calculation_mode === 'system') {
-                formData.append('class_score', resultData.class_score);
-                formData.append('exam_score', resultData.exam_score);
-            } else {
-                formData.append('score', resultData.score);
-                formData.append('class_score', resultData.class_score || 0);
-                formData.append('exam_score', resultData.exam_score || 0);
-            }
-
-            const response = await fetch('/academics/results/upload/result/new/', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': getCsrfToken()
-                }
-            });
-
-            if (response.ok) {
-                successCount++;
-            } else {
-                errorCount++;
-                const student = currentStudents.find(s => s.id == studentId);
-                errors.push(`${student.first_name} ${student.last_name}`);
-            }
-        } catch (error) {
-            errorCount++;
-            const student = currentStudents.find(s => s.id == studentId);
-            errors.push(`${student.first_name} ${student.last_name}`);
-            console.error(`Error submitting result for student ${studentId}:`, error);
-        }
-    }
-
-    // Hide loading modal
-    loadingModal.style.display = 'none';
-
-    // Show results
-    if (successCount > 0) {
-        showToast(`Successfully uploaded ${successCount} result(s)`, 'success');
-    }
-    
-    if (errorCount > 0) {
-        showToast(`Failed to upload ${errorCount} result(s): ${errors.join(', ')}`, 'error');
-    }
-
-    // If all succeeded, redirect
-    // if (errorCount === 0 && successCount > 0) {
-    //     setTimeout(() => {
-    //         window.location.href = '/academics/upload-results/';
-    //     }, 2000);
-    // } else {
-    //     // Reload the page to show updated results
-    //     setTimeout(() => {
-    //         window.location.reload();
-    //     }, 3000);
-    // }
+    showToast('All results are saved individually. Use "Enter Result" for each student.', 'info');
 }

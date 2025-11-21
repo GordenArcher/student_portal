@@ -25,10 +25,8 @@ function initializeModals() {
     // Edit form submission
     document.getElementById('updateTermBtn').addEventListener('click', updateTerm);
     
-    // Delete confirmation
     document.getElementById('confirmDeleteBtn').addEventListener('click', confirmDeleteTerm);
     
-    // Set current confirmation
     document.getElementById('confirmSetCurrentBtn').addEventListener('click', confirmSetCurrentTerm);
 }
 
@@ -38,7 +36,6 @@ async function loadTerms(page = 1) {
     const emptyState = document.getElementById('emptyState');
     const paginationContainer = document.getElementById('paginationContainer');
     
-    // Show loading
     tableBody.innerHTML = '';
     loadingState.style.display = 'flex';
     emptyState.style.display = 'none';
@@ -94,7 +91,6 @@ function displayTerms(terms) {
                         ${term.is_current ? '<span class="badge current-badge">Current</span>' : ''}
                     </div>
                 </td>
-                <td>${term.academic_year_name}</td>
                 <td>${formatDate(term.start_date)}</td>
                 <td>${formatDate(term.end_date)}</td>
                 <td>${duration}</td>
@@ -143,7 +139,6 @@ function attachActionListeners() {
         });
     });
     
-    // Delete buttons
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const termId = this.getAttribute('data-term-id');
@@ -152,7 +147,6 @@ function attachActionListeners() {
         });
     });
     
-    // Set current buttons
     document.querySelectorAll('.set-current-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const termId = this.getAttribute('data-term-id');
@@ -170,7 +164,6 @@ function openEditModal(termData) {
     document.getElementById('editEndDate').value = termData.end_date;
     document.getElementById('editIsCurrent').checked = termData.is_current;
     
-    // Show modal
     const modal = new bootstrap.Modal(document.getElementById('editTermModal'));
     modal.show();
 }

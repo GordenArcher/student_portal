@@ -58,11 +58,18 @@
                         </div>
 
                         <div class="form-group" style="margin-top: 32px;">
+
+                            <a href="{% url 'academic_years_list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i>
+                                Back to Academic Year
+                            </a>
+
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-plus-circle"></i>
                                 Create Academic Year
                             </button>
                         </div>
+                        
                     </form>
                 </div>
             </div>
@@ -73,7 +80,6 @@
 
 {% block js %}
 <script>
-// Remove the import statement - showToast should be globally available
 // import showToast from "/static/scripts/JS/admin_d.js"
 
 document.getElementById('currentYearContainer').addEventListener('click', function(e) {
@@ -102,7 +108,6 @@ document.getElementById('createAcademicYearForm').addEventListener('submit', asy
         submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Creating...';
         this.classList.add('loading');
         
-        // Make AJAX call
         const response = await fetch('{% url "create_academic_year" %}', {
             method: 'POST',
             body: formData,
@@ -147,7 +152,6 @@ document.getElementById('createAcademicYearForm').addEventListener('submit', asy
         }
         
     } catch (error) {
-        // Network or other errors
         console.error('Error creating academic year:', error);
         const errorMessage = 'Network error occurred. Please check your connection and try again.';
         
@@ -157,7 +161,6 @@ document.getElementById('createAcademicYearForm').addEventListener('submit', asy
             alert('Error: ' + errorMessage);
         }
     } finally {
-        // Reset button state
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
         this.classList.remove('loading');

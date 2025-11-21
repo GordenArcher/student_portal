@@ -282,7 +282,7 @@ class Result(models.Model):
     # Only calculate score if system calculation is selected
         if self.use_system_calculation:
             if self.class_score is not None and self.exam_score is not None:
-                self.score = round((self.class_score * 0.3) + (self.exam_score * 0.7), 2)
+                self.score = self.class_score + self.exam_score
 
         # Calculate grade and grade point
         if self.score is not None:
