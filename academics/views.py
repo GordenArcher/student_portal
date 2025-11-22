@@ -92,7 +92,6 @@ def subject_create(request):
         description = data.get("description")
         category = data.get("category", "core")
         is_active = data.get("is_active") == "true" or data.get("is_active") == "on"
-        teacher_id = data.get("teacher")
         
         if not all([name, code]):
             return JsonResponse({
@@ -112,7 +111,6 @@ def subject_create(request):
             description=description,
             category=category,
             is_active=is_active,
-            teacher_id=teacher_id if teacher_id else None,
         )
         
         response_data = {
@@ -128,7 +126,7 @@ def subject_create(request):
     except Exception as e:
         return JsonResponse({
             'success': False, 
-            'error': f'An error occurred while creating subject: {str(e)}'
+            'error': f'An error occurred while creating subject'
         }, status=400)
 
 
@@ -150,7 +148,6 @@ def subject_update(request, subject_id):
         description = data.get("description")
         category = data.get("category")
         is_active = data.get("is_active") == "true" or data.get("is_active") == "on"
-        teacher_id = data.get("teacher")
         
         if code != subject.code and Subject.objects.filter(code=code).exists():
             return JsonResponse({
@@ -163,7 +160,6 @@ def subject_update(request, subject_id):
         subject.description = description
         subject.category = category
         subject.is_active = is_active
-        subject.teacher_id = teacher_id if teacher_id else None
         subject.save()
         
         response_data = {
@@ -445,8 +441,6 @@ def get_subject_data(request, subject_id):
             'description': subject.description,
             'category': subject.category,
             'is_active': subject.is_active,
-            'teacher': str(subject.teacher.id) if subject.teacher else None,
-            'teacher_name': subject.teacher.get_full_name() if subject.teacher else None,
             'created_at': subject.created_at.isoformat(),
             'updated_at': subject.updated_at.isoformat(),
         }
@@ -455,6 +449,7 @@ def get_subject_data(request, subject_id):
         
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -797,37 +792,37 @@ def assign_teacher_to_class(request, class_id):
             'error': f'An error occurred while assigning teacher: {str(e)}'
         }, status=400)
     
-@login_required
-@require_http_methods(["POST"])
-def assign_teacher_to_subject(request, subject_id):
-    """API endpoint for assigning teacher to a subject"""
-    try:
-        subject = get_object_or_404(Subject, id=subject_id)
+# @login_required
+# @require_http_methods(["POST"])
+# def assign_teacher_to_subject(request, subject_id):
+#     """API endpoint for assigning teacher to a subject"""
+#     try:
+#         subject = get_object_or_404(Subject, id=subject_id)
         
-        teacher_id = request.POST.get("teacher_id")
+#         teacher_id = request.POST.get("teacher_id")
         
-        if teacher_id:
-            teacher = get_object_or_404(User, id=teacher_id, role='teacher')
-            subject.teacher = teacher
-        else:
-            subject.teacher = None
+#         if teacher_id:
+#             teacher = get_object_or_404(User, id=teacher_id, role='teacher')
+#             subject.teacher = teacher
+#         else:
+#             subject.teacher = None
             
-        subject.save()
+#         subject.save()
         
-        teacher_name = subject.teacher.get_full_name() if subject.teacher else "No teacher"
+#         teacher_name = subject.teacher.get_full_name() if subject.teacher else "No teacher"
         
-        response_data = {
-            'success': True,
-            'message': f'Successfully assigned {teacher_name} to {subject.name}.',
-        }
+#         response_data = {
+#             'success': True,
+#             'message': f'Successfully assigned {teacher_name} to {subject.name}.',
+#         }
         
-        return JsonResponse(response_data)
+#         return JsonResponse(response_data)
         
-    except Exception as e:
-        return JsonResponse({
-            'success': False, 
-            'error': f'An error occurred while assigning teacher: {str(e)}'
-        }, status=400)
+#     except Exception as e:
+#         return JsonResponse({
+#             'success': False, 
+#             'error': f'An error occurred while assigning teacher: {str(e)}'
+#         }, status=400)
 
 
 @login_required
@@ -874,45 +869,6 @@ def manage_subject_teachers(request, subject_id):
     
     return render(request, 'pages/admin_dashboard/manage_subject_teachers.html', context)
 
-
-# @login_required
-# @require_http_methods(["POST"])
-# def assign_teacher_to_class_subject(request):
-#     """API endpoint for assigning teacher to a subject for a specific class"""
-#     try:
-#         subject_id = request.POST.get("subject_id")
-#         class_level_id = request.POST.get("class_level_id")
-#         teacher_id = request.POST.get("teacher_id")
-#         academic_year_id = request.POST.get("academic_year_id")
-        
-#         subject = get_object_or_404(Subject, id=subject_id)
-#         class_level = get_object_or_404(ClassLevel, id=class_level_id)
-#         academic_year = get_object_or_404(AcademicYear, id=academic_year_id)
-#         teacher = get_object_or_404(User, id=teacher_id, role='teacher') if teacher_id else None
-        
-#         class_subject, created = ClassSubject.objects.update_or_create(
-#             class_level=class_level,
-#             subject=subject,
-#             academic_year=academic_year,
-#             defaults={'teacher': teacher}
-#         )
-        
-#         action = "assigned" if created else "updated"
-#         teacher_name = teacher.get_full_name() if teacher else "No teacher"
-        
-#         response_data = {
-#             'success': True,
-#             'message': f'Successfully {action} {teacher_name} to {subject.name} for {class_level.name}.',
-#         }
-        
-#         return JsonResponse(response_data)
-        
-#     except Exception as e:
-#         return JsonResponse({
-#             'success': False, 
-#             'error': f'An error occurred while assigning teacher: {str(e)}'
-#         }, status=400)
-    
 
 
 @login_required
@@ -966,6 +922,7 @@ def assign_teacher_to_class_subject(request):
         }, status=400)
 
 
+
 @login_required
 @require_http_methods(["POST"])
 def update_class_assignment(request):
@@ -994,6 +951,7 @@ def update_class_assignment(request):
             'success': False, 
             'error': f'An error occurred while updating assignment: {str(e)}'
         }, status=400)
+
 
 
 @login_required
@@ -1058,10 +1016,11 @@ def results_dashboard(request):
     
     if request.user.role == 'teacher':
         subjects = Subject.objects.filter(
-            Q(teacher=request.user) | Q(class_subjects__teacher=request.user)
+            classsubject__teacher=request.user
         ).distinct()
     else:
         subjects = Subject.objects.all()
+
     
     # Statistics
     total_results = results.count()
@@ -1102,105 +1061,6 @@ def results_dashboard(request):
     }
     
     return render(request, 'pages/admin_dashboard/results.html', {'context': context})
-
-
-@login_required
-def upload_results(request):
-    """Upload results for a class and subject"""
-    
-    # Only teachers allowed
-    if request.user.role != 'teacher':
-        return JsonResponse({
-            'success': False,
-            'error': 'Only teachers can upload results.'
-        }, status=403)
-    
-    teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
-
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            class_level_id = data.get('class_level_id')
-            subject_id = data.get('subject_id')
-            term_id = data.get('term_id')
-            results_data = data.get('results', [])
-            
-            class_level = get_object_or_404(ClassLevel, id=class_level_id)
-            subject = get_object_or_404(Subject, id=subject_id)
-            term = get_object_or_404(Term, id=term_id)
-            
-            # Verify teacher actually teaches this subject for this class
-            if not ClassSubject.objects.filter(
-                class_level=class_level,
-                subject=subject,
-                teacher=request.user
-            ).exists():
-                return JsonResponse({
-                    'success': False,
-                    'error': 'You are not assigned to teach this subject for this class.'
-                }, status=403)
-            
-            created_count = 0
-            updated_count = 0
-            
-            with transaction.atomic():
-                for result_data in results_data:
-                    student_id = result_data.get('student_id')
-                    score = result_data.get('score')
-                    
-                    if not student_id or score is None:
-                        continue
-                    
-                    student = get_object_or_404(User, id=student_id, role='student')
-                    
-                    # Create or update result
-                    result, created = Result.objects.update_or_create(
-                        student=student,
-                        subject=subject,
-                        class_level=class_level,
-                        term=term,
-                        defaults={
-                            'score': score,
-                            'uploaded_by': request.user,
-                            'is_published': False
-                        }
-                    )
-                    
-                    if created:
-                        created_count += 1
-                    else:
-                        updated_count += 1
-            
-            return JsonResponse({
-                'success': True,
-                'message': f'Successfully processed {created_count + updated_count} results '
-                           f'({created_count} created, {updated_count} updated)',
-                'created_count': created_count,
-                'updated_count': updated_count
-            })
-            
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Error uploading results: {str(e)}'
-            }, status=400)
-    
-    # GET request - show upload form
-    academic_years = AcademicYear.objects.all().order_by('-start_date')
-    class_levels = ClassLevel.objects.filter(is_active=True)
-    subjects = Subject.objects.filter(
-        classsubject__teacher=request.user
-    ).distinct()
-    
-    context = {
-        'academic_years': academic_years,
-        'class_levels': class_levels,
-        'subjects': subjects,
-    }
-    
-    return render(request, 'pages/academics/results/upload_result.html', {"context": context})
-
-
 
 
 @login_required

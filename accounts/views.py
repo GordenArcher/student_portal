@@ -1,13 +1,13 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 import json
 from .models import User, TeacherProfile, StudentProfile, StaffProfile
-from academics.models import Subject, ClassLevel, Term, Result, AcademicYear
+from academics.models import Subject, ClassLevel, Term, Result, AcademicYear, ClassSubject
 from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
@@ -1125,9 +1125,9 @@ def get_classes_ajax(request):
 def manage_results(request):
     teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
 
-    # Subjects this teacher teaches based on class assignments
+    # Subjects this teacher teaches
     subjects = Subject.objects.filter(
-        classsubject__teacher=request.user,
+        classsubject__teacher=teacher_profile.user,
         is_active=True
     ).distinct()
 
@@ -1136,9 +1136,9 @@ def manage_results(request):
         classsubject__teacher=request.user
     ).distinct()
 
-    # Results only for subjects this teacher teaches
+    # Results for subjects this teacher teaches
     results = Result.objects.filter(
-        subject__classsubject__teacher=request.user
+        subject__classsubject__teacher=teacher_profile.user
     ).select_related(
         'student', 'subject', 'class_level', 'term', 'uploaded_by'
     ).order_by('-date_uploaded').distinct()
@@ -1263,31 +1263,259 @@ def class_students_ajax(request, class_id):
 
 
 
+
 @login_required
 def student_results_ajax(request, student_id):
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        try:
-            teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
-            student = get_object_or_404(StudentProfile, id=student_id)
+    """
+    AJAX view to fetch results of a student for the subjects
+    taught by the logged-in teacher in that student's class.
+    """
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return JsonResponse({'error': 'Invalid request'}, status=400)
 
-            # Verify teacher teaches this student
-            if not student.current_class.class_subjects.filter(teacher=teacher_profile).exists():
-                return JsonResponse({'error': 'Not authorized'}, status=403)
+    try:
+        teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
+        student_profile = get_object_or_404(StudentProfile, id=student_id)
 
-            # Pull only results for subjects this teacher teaches
-            results = student.result_set.filter(
-                subject__classsubject__teacher=teacher_profile
-            ).select_related(
-                'subject', 'term', 'academic_year'
-            ).values(
+        if not student_profile.current_class:
+            return JsonResponse({
+                'success': True, 
+                'results': []
+            })
+
+        student_class = student_profile.current_class
+
+        # Get subjects through ClassSubject
+        class_subjects = ClassSubject.objects.filter(
+            class_level=student_class,
+            teacher=request.user  # Use User object here
+        )
+
+        teacher_subject_ids = class_subjects.values_list('subject_id', flat=True)
+
+        # Get results
+        results = Result.objects.filter(
+            student=student_profile.user,
+            subject_id__in=teacher_subject_ids,
+            class_level=student_class
+        ).select_related('subject', 'term', 'academic_year').values(
                 'id', 'score', 'grade', 'date_uploaded',
                 'subject__name', 'subject__code',
-                'term__name', 'academic_year__name'
+                'term__name'
             )
 
-            return JsonResponse({'success': True, 'results': list(results)})
+        return JsonResponse({
+                'success': True,
+                'results': list(results)
+            })
 
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False, 
+            'error': str(e)
+        }, status=400)
 
-    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+def profile_page(request):
+    """Profile page for all users - uses appropriate base template based on role"""
+    user = request.user
+    
+    # Determine which base template to use based on role
+    if user.role == 'admin':
+        base_template = 'base/admin_d.html'
+    elif user.role == 'teacher':
+        base_template = 'base/teacher_d.html'
+    elif user.role == 'student':
+        base_template = 'base/student_d.html'
+    else:
+        base_template = 'base/admin_d.html'
+    
+    context = {
+        'base_template': base_template,
+        'user_role': user.role,
+    }
+    
+    return render(request, 'accounts/profile.html', context)
+
+
+@login_required
+@require_http_methods(["PUT"])
+def update_profile(request):
+    """Update current user's profile"""
+    try:
+        user = request.user
+        data = json.loads(request.body)
+        
+        # Update basic user fields
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        user.email = data.get('email', user.email)
+        user.phone_number = data.get('phone_number', user.phone_number)
+        user.date_of_birth = data.get('date_of_birth', user.date_of_birth)
+        user.gender = data.get('gender', user.gender)
+        
+        # Update profile-specific fields based on role
+        if user.role == 'teacher' and hasattr(user, 'teacher_profile'):
+            teacher_profile = user.teacher_profile
+            teacher_profile.employment_type = data.get('employment_type', teacher_profile.employment_type)
+            teacher_profile.notes = data.get('notes', teacher_profile.notes)
+            teacher_profile.save()
+        
+        elif user.role == 'student' and hasattr(user, 'student_profile'):
+            student_profile = user.student_profile
+            student_profile.parent_full_name = data.get('parent_full_name', student_profile.parent_full_name)
+            student_profile.parent_phone = data.get('parent_phone', student_profile.parent_phone)
+            student_profile.parent_email = data.get('parent_email', student_profile.parent_email)
+            student_profile.parent_address = data.get('parent_address', student_profile.parent_address)
+            student_profile.emergency_contact_relation = data.get('emergency_contact_relation', student_profile.emergency_contact_relation)
+            student_profile.notes = data.get('notes', student_profile.notes)
+            student_profile.save()
+        
+        user.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Profile updated successfully',
+            'user': {
+                'id': str(user.id),
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'phone_number': user.phone_number,
+                'date_of_birth': user.date_of_birth.isoformat() if user.date_of_birth else None,
+                'gender': user.gender,
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+
+@login_required
+@require_http_methods(["POST"])
+def change_own_password(request):
+    """Change current user's password"""
+    try:
+        user = request.user
+        data = json.loads(request.body)
+        
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        confirm_password = data.get('confirm_password')
+        
+        # Verify current password
+        if not user.check_password(current_password):
+            return JsonResponse({'success': False, 'error': 'Current password is incorrect'}, status=400)
+        
+        if new_password != confirm_password:
+            return JsonResponse({'success': False, 'error': 'New passwords do not match'}, status=400)
+        
+        if len(new_password) < 8:
+            return JsonResponse({'success': False, 'error': 'Password must be at least 8 characters long'}, status=400)
+        
+        user.set_password(new_password)
+        user.save()
+        
+        # Update session to prevent logout
+        update_session_auth_hash(request, user)
+        
+        return JsonResponse({'success': True, 'message': 'Password changed successfully!'})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+
+@login_required
+def get_own_profile_data(request):
+    """Get current user's profile data"""
+    try:
+        user = request.user
+        
+        data = {
+            'id': str(user.id),
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'phone_number': user.phone_number,
+            'date_of_birth': user.date_of_birth.isoformat() if user.date_of_birth else None,
+            'gender': user.gender,
+            'role': user.role,
+            'username': user.username,
+        }
+        
+        # -------------------------------
+        # TEACHER PROFILE DATA
+        # -------------------------------
+        if user.role == 'teacher' and hasattr(user, 'teacher_profile'):
+            teacher_profile = user.teacher_profile
+
+            #Fetch ALL subjects the teacher teaches (across all classes)
+            class_subjects = ClassSubject.objects.filter(
+                teacher=user
+            ).select_related('subject', 'class_level')
+
+            # Unique subjects (teacher may teach same subject in different classes)
+            subjects_list = []
+            seen = set()
+
+            for cs in class_subjects:
+                key = cs.subject.id
+                if key not in seen:
+                    subjects_list.append({
+                        'id': str(cs.subject.id),
+                        'name': cs.subject.name,
+                        'code': cs.subject.code,
+                    })
+                    seen.add(key)
+
+            data.update({
+                'employee_id': teacher_profile.employee_id,
+                'employment_type': teacher_profile.employment_type,
+                'is_class_teacher': teacher_profile.is_class_teacher,
+                'class_teacher_of': str(teacher_profile.class_teacher_of.id) if teacher_profile.class_teacher_of else None,
+                'class_teacher_name': teacher_profile.class_teacher_of.name if teacher_profile.class_teacher_of else None,
+                'is_active': teacher_profile.is_active,
+                'notes': teacher_profile.notes,
+                'subjects': subjects_list,
+            })
+        
+        # -------------------------------
+        # STUDENT PROFILE DATA
+        # -------------------------------
+        elif user.role == 'student' and hasattr(user, 'student_profile'):
+            student_profile = user.student_profile
+
+            data.update({
+                'student_id': student_profile.student_id,
+                'current_class': str(student_profile.current_class.id) if student_profile.current_class else None,
+                'current_class_name': student_profile.current_class.name if student_profile.current_class else None,
+                'academic_year': student_profile.academic_year,
+                'parent_full_name': student_profile.parent_full_name,
+                'parent_phone': student_profile.parent_phone,
+                'parent_email': student_profile.parent_email,
+                'parent_address': student_profile.parent_address,
+                'emergency_contact_relation': student_profile.emergency_contact_relation,
+                'is_active': student_profile.is_active,
+                'notes': student_profile.notes,
+            })
+        
+        # -------------------------------
+        # ADMIN / STAFF PROFILE
+        # -------------------------------
+        elif user.role == 'admin' and hasattr(user, 'staff_profile'):
+            staff_profile = user.staff_profile
+            
+            data.update({
+                'employee_id': staff_profile.employee_id,
+                'department': staff_profile.department,
+                'position': staff_profile.position,
+            })
+        
+        return JsonResponse({'success': True, 'data': data})
+    
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)

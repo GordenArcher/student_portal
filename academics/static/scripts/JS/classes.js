@@ -558,8 +558,8 @@ function showManageSubjectsModal(classData, allSubjects, academicYears) {
                                                 <div class="subject-code">${subject.code}</div>
                                             </div>
                                             <div class="subject-category">
-                                                <span class="category-badge ${subject.category === 'core' ? 'core' : 'elective'}">
-                                                    ${subject.category === 'core' ? 'Core' : 'Elective'}
+                                                <span class="category-badge ${subject.category == 'core' ? 'core' : 'elective'}">
+                                                    ${subject.category == 'core' ? 'Core' : 'Elective'}
                                                 </span>
                                             </div>
                                         </div>
@@ -579,11 +579,11 @@ function showManageSubjectsModal(classData, allSubjects, academicYears) {
                         </div>
                         <div class="summary-item">
                             <span>Core Subjects:</span>
-                            <span id="coreCount">${classData.subjects.filter(s => s.category === 'core').length}</span>
+                            <span id="coreCount">${classData.subjects.filter(s => s.category == 'elective').length}</span>
                         </div>
                         <div class="summary-item">
                             <span>Elective Subjects:</span>
-                            <span id="electiveCount">${classData.subjects.filter(s => s.category === 'elective').length}</span>
+                            <span id="electiveCount">${classData.subjects.filter(s => s.category == 'core').length}</span>
                         </div>
                     </div>
                 </div>
@@ -702,7 +702,6 @@ async function updateClassSubjects(classId, formData) {
         const subjectCheckboxes = document.querySelectorAll('input[name="subjects"]:checked');
         console.log('Found checkboxes:', subjectCheckboxes.length);
         
-        // Debug each checkbox
         subjectCheckboxes.forEach((checkbox, index) => {
             console.log(`Checkbox ${index}:`, {
                 value: checkbox.value,
@@ -718,7 +717,7 @@ async function updateClassSubjects(classId, formData) {
                        checkbox.getAttribute('data-subject-id') || 
                        checkbox.id.replace('subject_', '');
             })
-            .filter(id => id && id !== ''); // Remove empty values
+            .filter(id => id && id !== '');
         
         console.log('Final subjectIds:', subjectIds);
         

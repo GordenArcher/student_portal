@@ -51,4 +51,11 @@ urlpatterns = [
     path('users/<uuid:user_id>/data/', views.get_user_data, name='get_user_data'),
     path('users/<uuid:user_id>/change-password/', views.change_password, name='change_password'),
     path('ajax/classes/', views.get_classes_ajax, name='ajax_classes'),
+    path('api/student/<int:student_id>/results/', views.student_results_ajax, name='student_results_ajax'),
+
+
+    path('profile/', views.profile_page, name='profile'),
+    path('api/profile/', views.get_own_profile_data, name='get_own_profile'),
+    path('api/profile/update/', views.update_profile, name='update_profile'),
+    path('api/profile/change-password/', views.change_own_password, name='change_own_password'),
 ]

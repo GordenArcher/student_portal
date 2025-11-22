@@ -2,6 +2,8 @@
 
 {% load static %}
 
+{% load number_format %}
+
 {% block title %}
     Classes
 {% endblock title %}
@@ -22,8 +24,9 @@
                         <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 4px;">Manage all class levels</p>
                     </div>
                 </div>
+
                 <div class="header-actions">
-                    <button class="btn btn-primary" id="openClassModal">
+                    <button type="button" class="btn btn-primary" id="openClassModal">
                         <i class="bi bi-plus-lg"></i> Add Class
                     </button>
                 </div>
@@ -31,19 +34,19 @@
 
             <div class="stats-row">
                 <div class="stat-box">
-                    <div class="stat-value">{{ context.total_classes|default:0 }}</div>
+                    <div class="stat-value">{{ context.total_classes|default_if_none:0|shortnum }}</div>
                     <div class="stat-label">Total Classes</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-value">{{ context.active_classes|default:0 }}</div>
+                    <div class="stat-value">{{ context.active_classes|default_if_none:0|shortnum }}</div>
                     <div class="stat-label">Active Classes</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-value">{{ context.total_students|default:0 }}</div>
+                    <div class="stat-value">{{ context.total_students|default_if_none:0|shortnum }}</div>
                     <div class="stat-label">Total Students</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-value">{{ context.total_capacity|default:0 }}</div>
+                    <div class="stat-value">{{ context.total_capacity|default_if_none:0|shortnum }}</div>
                     <div class="stat-label">Total Capacity</div>
                 </div>
             </div>
@@ -58,12 +61,13 @@
                     </div>
                     <div class="filter-group">
                         <label><i class="bi bi-bar-chart-line"></i> Status</label>
-                        <select name="is_active" class="form-control">
+                        <select title="select status" name="is_active" class="form-control">
                             <option value="">All Status</option>
                             <option value="true" {% if context.is_active == 'true' %}selected{% endif %}>Active</option>
                             <option value="false" {% if context.is_active == 'false' %}selected{% endif %}>Inactive</option>
                         </select>
                     </div>
+
                     <div class="filter-group">
                         <label>&nbsp;</label>
                         <button type="submit" class="btn btn-primary" style="width: 100%;">
@@ -76,84 +80,85 @@
 
         <div class="classes-grid">
             {% for class in context.page_obj %}
-            <div class="class-card">
-                <div class="class-header">
-                    <div class="class-icon" style="background: var(--primary);">
-                        <i class="bi bi-building"></i>
+                <div class="class-card">
+                    <div class="class-header">
+                        <div class="class-icon" style="background: var(--primary);">
+                            <i class="bi bi-building"></i>
+                        </div>
+                        <div class="class-name">{{ class.name }}</div>
+                        <div class="class-code">{{ class.code|default:"No code" }}</div>
                     </div>
-                    <div class="class-name">{{ class.name }}</div>
-                    <div class="class-code">{{ class.code|default:"No code" }}</div>
-                </div>
-                <div class="class-body">
-                    <div class="info-row">
-                        <div class="info-icon" style="background: #d1fae5; color: var(--secondary);">
-                            <i class="bi bi-people"></i>
+                     
+                    <div class="class-body">
+                        <div class="info-row">
+                            <div class="info-icon" style="background: #d1fae5; color: var(--secondary);">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Students</div>
+                                <div class="info-value">{{ class.current_students_count }} / {{ class.capacity }}</div>
+                            </div>
                         </div>
-                        <div class="info-content">
-                            <div class="info-label">Students</div>
-                            <div class="info-value">{{ class.current_students_count }} / {{ class.capacity }}</div>
+                        <div class="info-row">
+                            <div class="info-icon" style="background: #dbeafe; color: var(--primary);">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Form Teacher</div>
+                                <div class="info-value">{{ class.form_teacher.get_full_name|default:"Not assigned" }}</div>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="info-icon" style="background: #ede9fe; color: var(--purple);">
+                                <i class="bi bi-journal-text"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Subjects</div>
+                                <div class="info-value">{{ class.subjects.count }} Subjects</div>
+                            </div>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-info">
+                                <span>Capacity</span>
+                                <span>{{ class.current_students_count }} / {{ class.capacity }}</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {% widthratio class.current_students_count class.capacity 100 %}%;"></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="info-row">
-                        <div class="info-icon" style="background: #dbeafe; color: var(--primary);">
-                            <i class="bi bi-person"></i>
-                        </div>
-                        <div class="info-content">
-                            <div class="info-label">Form Teacher</div>
-                            <div class="info-value">{{ class.form_teacher.get_full_name|default:"Not assigned" }}</div>
-                        </div>
-                    </div>
-                    <div class="info-row">
-                        <div class="info-icon" style="background: #ede9fe; color: var(--purple);">
-                            <i class="bi bi-journal-text"></i>
-                        </div>
-                        <div class="info-content">
-                            <div class="info-label">Subjects</div>
-                            <div class="info-value">{{ class.subjects.count }} Subjects</div>
-                        </div>
-                    </div>
-                    <div class="progress-container">
-                        <div class="progress-info">
-                            <span>Capacity</span>
-                            <span>{{ class.current_students_count }} / {{ class.capacity }}</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: {% widthratio class.current_students_count class.capacity 100 %}%;"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="class-footer">
-                    <button class="btn btn-secondary btn-sm view-btn" data-class-id="{{ class.id }}">
-                        <i class="bi bi-eye"></i> View
-                    </button>
-                    <button class="btn btn-primary btn-sm edit-btn" data-class-id="{{ class.id }}">
-                        <i class="bi bi-pencil-square"></i> Edit
-                    </button>
-                    <div class="dropdown">
-                        <button class="btn btn-actions btn-sm dropdown-toggle" type="button">
-                            <i class="bi bi-three-dots-vertical"></i>
+                    <div class="class-footer">
+                        <button class="btn btn-secondary btn-sm view-btn" data-class-id="{{ class.id }}">
+                            <i class="bi bi-eye"></i> View
                         </button>
-                        <div class="dropdown-menu">
-                            <button class="dropdown-item assign-teacher-btn" data-class-id="{{ class.id }}">
-                                <i class="bi bi-person-plus"></i> Assign Teacher
+                        <button class="btn btn-primary btn-sm edit-btn" data-class-id="{{ class.id }}">
+                            <i class="bi bi-pencil-square"></i> Edit
+                        </button>
+                        <div class="dropdown">
+                            <button title="more options" class="btn btn-actions btn-sm dropdown-toggle" type="button">
+                                <i class="bi bi-three-dots-vertical"></i>
                             </button>
-                            <button class="dropdown-item manage-subjects-btn" data-class-id="{{ class.id }}">
-                                <i class="bi bi-journal-plus"></i> Manage Subjects
-                            </button>
-                            <div class="dropdown-divider"></div>
-                            <button class="dropdown-item delete-btn text-danger" data-class-id="{{ class.id }}">
-                                <i class="bi bi-trash"></i> Delete Class
-                            </button>
+                            <div class="dropdown-menu">
+                                <button class="dropdown-item assign-teacher-btn" data-class-id="{{ class.id }}">
+                                    <i class="bi bi-person-plus"></i> Assign Teacher
+                                </button>
+                                <button class="dropdown-item manage-subjects-btn" data-class-id="{{ class.id }}">
+                                    <i class="bi bi-journal-plus"></i> Manage Subjects
+                                </button>
+                                <div class="dropdown-divider"></div>
+                                <button class="dropdown-item delete-btn text-danger" data-class-id="{{ class.id }}">
+                                    <i class="bi bi-trash"></i> Delete Class
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
             {% empty %}
-            <div class="no-classes">
-                <i class="bi bi-building-x" style="font-size: 3rem; color: var(--text-secondary);"></i>
-                <h3>No classes found</h3>
-                <p>No classes match your current filters.</p>
-            </div>
+                <div class="no-classes">
+                    <i class="bi bi-building-x" style="font-size: 3rem; color: var(--text-secondary);"></i>
+                    <h3>No classes found</h3>
+                    <p>No classes match your current filters.</p>
+                </div>
             {% endfor %}
         </div>
 
