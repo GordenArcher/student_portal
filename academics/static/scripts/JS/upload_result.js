@@ -1,6 +1,4 @@
 import showToast from "/static/scripts/JS/admin_d.js"
-import hideLoader from "/static/scripts/JS/admin_d.js"
-import showLoader from "/static/scripts/JS/admin_d.js"
 import getCsrfToken from "/static/scripts/JS/utility/getCsrfToken.js"
 
 // Store results data

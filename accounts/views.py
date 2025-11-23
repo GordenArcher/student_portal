@@ -1035,7 +1035,7 @@ def student_dashboard(request):
     # Base queryset for results
     results = Result.objects.filter(
         student=request.user,
-        is_published=True
+        is_published=False
     ).select_related('subject', 'class_level', 'term', 'term__academic_year')
     
     # Apply filters
@@ -1101,7 +1101,7 @@ def student_dashboard(request):
         }
     }
     
-    return render(request, 'accounts/student_dashboard.html', {'context': context})
+    return render(request, 'accounts/student_dashboard.html', context)
 
 
 
@@ -1384,7 +1384,7 @@ def update_profile(request):
                 'last_name': user.last_name,
                 'email': user.email,
                 'phone_number': user.phone_number,
-                'date_of_birth': user.date_of_birth.isoformat() if user.date_of_birth else None,
+                'date_of_birth': user.date_of_birth if user.date_of_birth else None,
                 'gender': user.gender,
             }
         })

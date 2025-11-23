@@ -1,4 +1,5 @@
 import showToast from "/static/scripts/JS/admin_d.js"
+import getCsrfToken from "/static/scripts/JS/utility/getCsrfToken.js"
 
 document.addEventListener('DOMContentLoaded', function() {
     let profileData = {};
@@ -8,11 +9,9 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const tabName = this.getAttribute('data-tab');
             
-            // Update active tab button
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
             this.classList.add('active');
             
-            // Show active tab content
             document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
             document.getElementById(`${tabName}Tab`).classList.add('active');
         });
@@ -23,9 +22,12 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/account/api/profile/');
             const data = await response.json();
+
+            console.log(data)
             
             if (data.success) {
                 profileData = data.data;
+                console.log(profileData)
                 populateProfileData();
             } else {
                 showToast('Error loading profile data', 'error');
@@ -37,7 +39,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Populate profile data in forms
     function populateProfileData() {
-        // Header information
         document.getElementById('profileName').textContent = `${profileData.first_name} ${profileData.last_name}`;
         document.getElementById('profileRole').textContent = profileData.role.charAt(0).toUpperCase() + profileData.role.slice(1);
         
@@ -53,17 +54,23 @@ document.addEventListener('DOMContentLoaded', function() {
             profileId.textContent = profileData.username;
         }
         
-        // Avatar
         const avatar = document.getElementById('profileAvatar');
         avatar.textContent = (profileData.first_name[0] + profileData.last_name[0]).toUpperCase();
         
-        // Personal form
         document.querySelector('input[name="first_name"]').value = profileData.first_name || '';
         document.querySelector('input[name="last_name"]').value = profileData.last_name || '';
         document.querySelector('input[name="email"]').value = profileData.email || '';
         document.querySelector('input[name="phone_number"]').value = profileData.phone_number || '';
         document.querySelector('input[name="date_of_birth"]').value = profileData.date_of_birth || '';
         document.querySelector('select[name="gender"]').value = profileData.gender || '';
+
+        if (profileData.role === 'student') {
+            const emailField = document.querySelector('input[name="email"]').closest('.form-group');
+            const phoneField = document.querySelector('input[name="phone_number"]').closest('.form-group');
+            
+            if (emailField) emailField.style.display = 'none';
+            if (phoneField) phoneField.style.display = 'none';
+        }
         
         // Profile details
         populateProfileDetails();
@@ -223,12 +230,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (result.success) {
                 showToast('Profile updated successfully', 'success');
-                // Reload profile data to reflect changes
                 loadProfileData();
             } else {
                 showToast(result.error, 'error');
             }
         } catch (error) {
+            console.log(error)
             showToast('Error updating profile', 'error');
         }
     });
@@ -293,11 +300,6 @@ document.addEventListener('DOMContentLoaded', function() {
             level: levels[strength] || 'weak',
             text: texts[strength] || 'Weak'
         };
-    }
-    
-    // CSRF token helper
-    function getCsrfToken() {
-        return document.querySelector('[name=csrfmiddlewaretoken]').value;
     }
     
     // Initialize

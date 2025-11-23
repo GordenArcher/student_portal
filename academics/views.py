@@ -56,7 +56,7 @@ def subject_list(request):
     elective_subjects = subjects.filter(category='elective').count()
     active_subjects = subjects.filter(is_active=True).count()
     
-    paginator = Paginator(subjects, 20)
+    paginator = Paginator(subjects, 9)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
@@ -228,7 +228,7 @@ def class_list(request):
     total_capacity = sum(cls.capacity for cls in classes)
     total_students = sum(cls.current_students_count for cls in classes)
     
-    paginator = Paginator(classes, 20)
+    paginator = Paginator(classes, 9)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     

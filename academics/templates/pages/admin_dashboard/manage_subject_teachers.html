@@ -51,7 +51,13 @@
                                         <select title="select academic year" name="academic_year_id" class="form-control" required>
                                             <option value="">Select Year</option>
                                             {% for year in academic_years %}
-                                                <option value="{{ year.id }}">{{ year.name }}</option>
+                                                <option value="{{ year.id }}">
+                                                    {{ year.name }}
+
+                                                    {% if year.is_current %}
+                                                        ( current academic year )
+                                                    {% endif %}
+                                                </option>
                                             {% endfor %}
                                         </select>
                                     </div>

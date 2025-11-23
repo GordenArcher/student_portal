@@ -148,16 +148,15 @@
     }
 }
 </style>
+<link rel="stylesheet" href="{% static 'styles/profile.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4 main-content">
     <div class="profile-container">
-        <!-- Profile Header -->
         <div class="profile-header">
             <div class="d-flex align-items-center gap-4">
                 <div class="profile-avatar" id="profileAvatar">
-                    <!-- Avatar will be populated by JavaScript -->
                 </div>
                 <div class="profile-info">
                     <h2 id="profileName">Loading...</h2>
@@ -169,7 +168,6 @@
             </div>
         </div>
 
-        <!-- Profile Tabs -->
         <div class="profile-tabs">
             <div class="tab-header">
                 <button class="tab-button active" data-tab="personal">Personal Information</button>
@@ -179,13 +177,14 @@
                     {% elif user_role == 'admin' %}Admin Profile
                     {% else %}Profile Details{% endif %}
                 </button>
+
                 <button class="tab-button" data-tab="password">Change Password</button>
             </div>
 
             <div class="tab-content">
-                <!-- Personal Information Tab -->
                 <div class="tab-pane active" id="personalTab">
                     <form id="personalForm">
+                        {% csrf_token %}
                         <div class="form-grid">
                             <div class="form-group">
                                 <label class="form-label">First Name *</label>
@@ -196,8 +195,8 @@
                                 <input type="text" class="form-control" name="last_name" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Email *</label>
-                                <input type="email" class="form-control" name="email" required>
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" name="email">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Phone Number</label>
@@ -217,20 +216,18 @@
                                 </select>
                             </div>
                         </div>
+                        
                         <div class="form-footer">
                             <button type="submit" class="btn btn-primary">Save Changes</button>
                         </div>
                     </form>
                 </div>
 
-                <!-- Profile Details Tab -->
                 <div class="tab-pane" id="profileTab">
                     <div id="profileDetails">
-                        <!-- Role-specific details will be loaded here by JavaScript -->
                     </div>
                 </div>
 
-                <!-- Change Password Tab -->
                 <div class="tab-pane" id="passwordTab">
                     <form id="passwordForm">
                         <div class="form-section">

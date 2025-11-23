@@ -222,11 +222,11 @@ function showEditModal(subjectData) {
             <form id="editSubjectForm" data-subject-id="${subjectData.id}">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label>Subject Name *</label>
+                        <label>Subject Name</label>
                         <input type="text" name="name" class="form-control" value="${subjectData.name || ''}" required>
                     </div>
                     <div class="form-group">
-                        <label>Subject Code *</label>
+                        <label>Subject Code</label>
                         <input type="text" name="code" class="form-control" value="${subjectData.code || ''}" required>
                     </div>
                     <div class="form-group">
@@ -298,7 +298,7 @@ async function updateSubject(subjectId, formData) {
 }
 
 
-// Assign teacher to subject
+// Assign teacher to subject, this is outdated, it'snot been used
 async function assignTeacherToSubject(subjectId) {
     try {
         showLoader();
@@ -327,7 +327,7 @@ async function assignTeacherToSubject(subjectId) {
     }
 }
 
-// Show teacher assignment modal
+// Show teacher assignment modal, this is outdated, it'snot been used
 function showTeacherAssignmentModal(subjectId, teachers) {
     const modal = document.createElement('div');
     modal.className = 'modal show';
@@ -340,7 +340,7 @@ function showTeacherAssignmentModal(subjectId, teachers) {
             <form id="assignTeacherForm" data-subject-id="${subjectId}">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label>Select Teacher *</label>
+                        <label>Select Teacher</label>
                         <select name="teacher_id" class="form-control" required>
                             <option value="">Select a teacher...</option>
                             ${teachers.map(teacher => `
@@ -374,7 +374,7 @@ function showTeacherAssignmentModal(subjectId, teachers) {
     });
 }
 
-// Submit teacher assignment
+// Submit teacher assignment, this is outdated, it'snot been used
 async function submitTeacherAssignment(subjectId, formData) {
     try {
         const response = await fetch(`/academics/subjects/${subjectId}/assign-teacher/`, {

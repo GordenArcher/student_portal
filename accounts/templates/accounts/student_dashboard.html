@@ -1,5 +1,8 @@
 {% extends "base/student_d.html" %}
+
 {% load static %}
+
+{% load number_format %}
 
 {% block title %}Student Dashboard{% endblock %}
 
@@ -13,27 +16,27 @@
         <div class="header-content">
             <div class="student-info">
                 <div class="student-avatar">
-                    {% if context.student.user.profile_picture %}
-                        <img src="{{ context.student.user.profile_picture.url }}" alt="{{ context.student.user.get_full_name }}">
+                    {% if student.user.profile_picture %}
+                        <img src="{{ student.user.profile_picture.url }}" alt="{{ student.user.get_full_name }}">
                     {% else %}
                         <i class="bi bi-person-circle"></i>
                     {% endif %}
                 </div>
                 <div class="student-details">
-                    <h1>Welcome back, {{ context.student.user.first_name }}! 👋</h1>
+                    <h1>Welcome back, {{ student.user.first_name }}! 👋</h1>
                     <div class="student-meta">
                         <span class="meta-item">
                             <i class="bi bi-person-badge"></i>
-                            {{ context.student.student_id }}
+                            {{ student.student_id }}
                         </span>
                         <span class="meta-item">
                             <i class="bi bi-building"></i>
-                            {{ context.student.current_class.name }}
+                            {{ student.current_class.name }}
                         </span>
                         <span class="meta-item">
                             <i class="bi bi-person"></i>
-                            {% if context.class_teacher %}
-                                {{ context.class_teacher.user.get_full_name }}
+                            {% if class_teacher %}
+                                {{ class_teacher.user.get_full_name }}
                             {% else %}
                                 No class teacher
                             {% endif %}
@@ -42,7 +45,7 @@
                 </div>
             </div>
             <div class="academic-year">
-                <strong>{{ context.student.academic_year }}</strong>
+                <strong>{{ student.academic_year }}</strong>
                 <span>Academic Year</span>
             </div>
         </div>
@@ -54,7 +57,7 @@
                 <i class="bi bi-journal-text" style="color: #2563eb;"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value">{{ context.total_results }}</div>
+                <div class="stat-value">{{ total_results }}</div>
                 <div class="stat-label">Published Results</div>
             </div>
         </div>
@@ -64,7 +67,7 @@
                 <i class="bi bi-graph-up" style="color: #10b981;"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value">{{ context.average_score }}%</div>
+                <div class="stat-value">{{ average_score|floatformat:2 }}%</div>
                 <div class="stat-label">Average Score</div>
             </div>
         </div>
@@ -75,8 +78,8 @@
             </div>
             <div class="stat-content">
                 <div class="stat-value">
-                    {% if context.best_subject %}
-                        {{ context.best_subject.score|floatformat:1 }}%
+                    {% if best_subject %}
+                        {{ best_subject.score|floatformat:0 }}%
                     {% else %}
                         -
                     {% endif %}
@@ -91,8 +94,8 @@
             </div>
             <div class="stat-content">
                 <div class="stat-value">
-                    {% if context.best_subject %}
-                        {{ context.best_subject.grade }}
+                    {% if best_subject %}
+                        {{ best_subject.grade }}
                     {% else %}
                         -
                     {% endif %}
@@ -108,24 +111,32 @@
             <div class="filter-grid">
                 <div class="filter-group">
                     <label>Academic Year</label>
-                    <select name="academic_year" class="form-control">
+                    <select title="select academicyear" name="academic_year" class="form-control">
                         <option value="">All Years</option>
-                        {% for year in context.academic_years %}
-                        <option value="{{ year.id }}" {% if context.current_filters.academic_year_id == year.id|stringformat:"s" %}selected{% endif %}>
-                            {{ year.name }}
-                        </option>
+                        {% for year in academic_years %}
+                            <option value="{{ year.id }}" {% if current_filters.academic_year_id == year.id|stringformat:"s" %}selected{% endif %}>
+                                {{ year.name }}
+
+                                {% if year.is_current %}
+                                    ( current academic year)
+                                {% endif %}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
                 
                 <div class="filter-group">
                     <label>Term</label>
-                    <select name="term" class="form-control">
+                    <select title="select term" name="term" class="form-control">
                         <option value="">All Terms</option>
-                        {% for term in context.terms %}
-                        <option value="{{ term.id }}" {% if context.current_filters.term_id == term.id|stringformat:"s" %}selected{% endif %}>
-                            {{ term.name }}
-                        </option>
+                        {% for term in terms %}
+                            <option value="{{ term.id }}" {% if current_filters.term_id == term.id|stringformat:"s" %}selected{% endif %}>
+                                {{ term.name }}
+
+                                {% if term.is_current %}
+                                    ( current term )
+                                {% endif %}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
@@ -147,46 +158,68 @@
         <div class="card results-section">
             <div class="card-header">
                 <h3>📚 Academic Results</h3>
-                <span class="results-count">{{ context.total_results }} results</span>
+                <span class="results-count">{{ total_results }} results</span>
             </div>
             <div class="card-body">
-                {% if context.results_by_term %}
-                    {% for term_key, term_data in context.results_by_term.items %}
-                    <div class="term-results">
-                        <div class="term-header">
-                            <h4>{{ term_key }}</h4>
-                            <span class="term-count">{{ term_data.results|length }} subjects</span>
-                        </div>
-                        <div class="results-grid">
-                            {% for result in term_data.results %}
-                            <div class="result-card">
-                                <div class="subject-info">
-                                    <div class="subject-name">{{ result.subject.name }}</div>
-                                    <div class="subject-code">{{ result.subject.code }}</div>
-                                </div>
-                                <div class="result-details">
-                                    <div class="score-section">
-                                        <div class="score-value">{{ result.score }}%</div>
-                                        <div class="grade-badge grade-{{ result.grade|lower }}">{{ result.grade }}</div>
-                                    </div>
-                                    <div class="result-meta">
-                                        <span class="upload-date">
-                                            <i class="bi bi-calendar"></i>
-                                            {{ result.date_uploaded|date:"M d, Y" }}
-                                        </span>
-                                    </div>
-                                </div>
+                {% if results_by_term %}
+                    {% for term_key, term_data in results_by_term.items %}
+                        <div class="term-results">
+                            <div class="term-header">
+                                <h4>{{ term_key }}</h4>
+                                <span class="term-count">{{ term_data.results|length }} subjects</span>
                             </div>
-                            {% endfor %}
+                            
+                            <div class="results-table-container">
+                                <table class="results-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="subject-col">Subject</th>
+                                            <th class="score-col">Class Score</th>
+                                            <th class="score-col">Exam Score</th>
+                                            <th class="score-col">Total Score</th>
+                                            <th class="grade-col">Grade</th>
+                                            <th class="date-col">Remarks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for result in term_data.results %}
+                                        <tr class="result-row">
+                                            <td class="subject-cell">
+                                                <div class="subject-info">
+                                                    <div class="subject-name">{{ result.subject.name }}</div>
+                                                    <div class="subject-code">{{ result.subject.code }}</div>
+                                                </div>
+                                            </td>
+                                            <td class="score-cell">
+                                                <span class="class-score">{{ result.class_score }}%</span>
+                                            </td>
+                                            <td class="score-cell">
+                                                <span class="exam-score">{{ result.exam_score }}%</span>
+                                            </td>
+                                            <td class="score-cell">
+                                                <span class="total-score">{{ result.score }}%</span>
+                                            </td>
+                                            <td class="grade-cell">
+                                                <span class="grade-badge grade-{{ result.grade|lower }}">{{ result.grade }}</span>
+                                            </td>
+                                            <td class="date-cell">
+                                                <span class="upload-date">
+                                                    {{ result.remarks|default:"No remarks" }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
                     {% endfor %}
                 {% else %}
-                <div class="empty-state">
-                    <i class="bi bi-journal-x"></i>
-                    <h4>No Results Found</h4>
-                    <p>No published results match your current filters</p>
-                </div>
+                    <div class="empty-state">
+                        <i class="bi bi-journal-x"></i>
+                        <h4>No Results Found</h4>
+                        <p>No published results match your current filters</p>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -197,16 +230,16 @@
                     <h3>📊 Grade Distribution</h3>
                 </div>
                 <div class="card-body">
-                    {% if context.grade_distribution %}
+                    {% if grade_distribution %}
                     <div class="grade-distribution">
-                        {% for grade in context.grade_distribution %}
+                        {% for grade in grade_distribution %}
                         <div class="grade-item">
                             <div class="grade-info">
                                 <span class="grade-label grade-{{ grade.grade|lower }}">{{ grade.grade }}</span>
                                 <span class="grade-count">{{ grade.count }}</span>
                             </div>
                             <div class="grade-bar">
-                                <div class="bar-fill" style="width: {% widthratio grade.count context.total_results 100 %}%"></div>
+                                <div class="bar-fill" style="width: {% widthratio grade.count total_results 100 %}%"></div>
                             </div>
                         </div>
                         {% endfor %}
@@ -225,9 +258,9 @@
                     <h3>🎯 Subject Performance</h3>
                 </div>
                 <div class="card-body">
-                    {% if context.subject_performance %}
+                    {% if subject_performance %}
                     <div class="subject-performance">
-                        {% for subject in context.subject_performance %}
+                        {% for subject in subject_performance %}
                         <div class="subject-item">
                             <div class="subject-header">
                                 <strong>{{ subject.subject__name }}</strong>
@@ -257,9 +290,9 @@
                     <h3>🕒 Recent Results</h3>
                 </div>
                 <div class="card-body">
-                    {% if context.recent_results %}
+                    {% if recent_results %}
                     <div class="recent-activity">
-                        {% for result in context.recent_results %}
+                        {% for result in recent_results %}
                         <div class="activity-item">
                             <div class="activity-icon">
                                 <i class="bi bi-file-earmark-text"></i>
@@ -283,29 +316,4 @@
         </div>
     </div>
 </main>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const filterForm = document.querySelector('.filters-form');
-    if (filterForm) {
-        const inputs = filterForm.querySelectorAll('select');
-        inputs.forEach(input => {
-            input.addEventListener('change', function() {
-                clearTimeout(window.filterTimeout);
-                window.filterTimeout = setTimeout(() => {
-                    filterForm.submit();
-                }, 500);
-            });
-        });
-    }
-
-    const resultCards = document.querySelectorAll('.result-card');
-    resultCards.forEach((card, index) => {
-        card.style.animationDelay = `${index * 0.1}s`;
-        card.classList.add('animate-in');
-    });
-});
-</script>
 {% endblock %}
