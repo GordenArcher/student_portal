@@ -73,7 +73,7 @@ student_portal/
 │   ├── templates/academics/
 │   └── admin.py
 │
-├── results/         # Student results, grades, and reports
+├── results/         # ----> moved to academics so this foldeoesn't exist anymore
 │   ├── models.py
 │   ├── views.py
 │   ├── urls.py
@@ -86,11 +86,14 @@ student_portal/
 │   ├── templates/core/
 │   └── admin.py
 │
-├── templates/       # Shared templates (e.g., base.html, layout.html)
 │
 ├── static/          # Static assets (CSS, JS, images)
 │
-└── manage.py
+├── README.md
+├── dockerfile
+├── docker-compose.yml
+├── manage.py
+└── ...
 ```
 
 ---
