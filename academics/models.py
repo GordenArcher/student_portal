@@ -150,7 +150,7 @@ class Term(models.Model):
         Academic term within an academic year
     """
     name = models.CharField(max_length=50)
-    academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name='terms')
+    academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name='terms', null=True, blank=True)
     start_date = models.DateField()
     end_date = models.DateField()
     is_current = models.BooleanField(default=False)

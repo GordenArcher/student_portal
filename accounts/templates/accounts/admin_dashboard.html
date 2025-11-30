@@ -78,10 +78,6 @@
                 <p id="academy-date">Here's what's happening at New Star Academy today • <span id="current-date"></span></p>
             </div>
             <div class="top-bar-actions">
-                <div class="search-box">
-                    <span>🔍</span>
-                    <input type="text" placeholder="Search students, teachers...">
-                </div>
 
                 <a href="{% url 'logout' %}" class="logout-btn">
                     <span><i class="bi bi-box-arrow-right"></i></span>
@@ -182,9 +178,9 @@
                 <div class="action-icon">➕</div>
                 <div class="action-label">Add Student</div>
             </a>
-            <a href="{% url 'teacher_create' %}" class="action-card">
+            <a href="{% url 'create_admin_page' %}" class="action-card">
                 <div class="action-icon">👨‍🏫</div>
-                <div class="action-label">Add Teacher</div>
+                <div class="action-label">Add Admin</div>
             </a>
             <a href="{% url 'create_academic_year' %}" class="action-card">
                 <div class="action-icon">📊</div>
@@ -262,7 +258,6 @@
             <div class="table-card">
                 <div class="table-header">
                     <h3>🏆 Top Performing Students</h3>
-                    <a href="#" class="view-all-btn">View All →</a>
                 </div>
                 {% if context.top_students %}
                 <table>

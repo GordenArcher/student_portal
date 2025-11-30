@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.db.models import Count
 from .models import User, TeacherProfile, StudentProfile, StaffProfile
+from django.contrib.admin import SimpleListFilter
 
 
 @admin.register(User)
@@ -131,6 +132,28 @@ class SubjectInline(admin.TabularInline):
     verbose_name_plural = 'Subjects Taught'
 
 
+
+class IsClassTeacherFilter(SimpleListFilter):
+    """Custom filter for is_class_teacher property"""
+    title = 'is class teacher'
+    parameter_name = 'is_class_teacher'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('yes', 'Yes'),
+            ('no', 'No'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'yes':
+            # Teachers who are form teachers of any class
+            return queryset.filter(user__class_levels_taught__isnull=False).distinct()
+        if self.value() == 'no':
+            # Teachers who are not form teachers of any class
+            return queryset.filter(user__class_levels_taught__isnull=True)
+        return queryset
+    
+
 @admin.register(TeacherProfile)
 class TeacherProfileAdmin(admin.ModelAdmin):
     """Admin for Teacher Profile"""
@@ -138,11 +161,11 @@ class TeacherProfileAdmin(admin.ModelAdmin):
     list_display = (
         'employee_id', 'user_full_name', 'user_link',
         'employment_type', 'subjects_count', 
-        'is_class_teacher', 'class_teacher_of',
+        IsClassTeacherFilter, 'class_teacher_of',
         'is_active', 'created_at'
     )
     list_filter = (
-        'employment_type', 'is_class_teacher', 
+        'employment_type', IsClassTeacherFilter, 
         'is_active', 'created_at', 'subjects'
     )
     search_fields = (
@@ -229,6 +252,12 @@ class TeacherProfileAdmin(admin.ModelAdmin):
         updated = queryset.update(is_class_teacher=True)
         self.message_user(request, f'{updated} teacher(s) marked as class teachers.')
     make_class_teachers.short_description = 'Mark as class teachers'
+
+
+    def is_class_teacher(self, obj):
+        return obj.is_class_teacher
+    is_class_teacher.boolean = True
+    is_class_teacher.short_description = 'Class Teacher'
 
 
 @admin.register(StudentProfile)

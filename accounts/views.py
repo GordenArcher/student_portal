@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
 from django.contrib import messages
 from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.core.paginator import Paginator
 import json
 from .models import User, TeacherProfile, StudentProfile, StaffProfile
@@ -11,39 +11,79 @@ from academics.models import Subject, ClassLevel, Term, Result, AcademicYear, Cl
 from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
-from .utils.generateID import generate_teacher_id, generate_student_id
+from .utils.generateID import generate_teacher_id, generate_student_id, generate_staff_id
 from core.views import get_recent_activities, get_teacher_workload
 from django.db.models import Case, When, Q, Count, Avg, Max
-from django.db import models
+from django.db import models, IntegrityError
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.utils import timezone
+from .utils.redirect_to_dashboard import redirect_to_dashboard
+from .utils.cache_failed_attempt import cache_failed_attempt
+from .utils.get_client_ip import get_client_ip
 
 
-
-
-# ============ Authentication Views ============
 
 @require_http_methods(["GET", "POST"])
 def login_view(request):
-    """User login"""
+    """User login with brute force protection"""
+    
+    if request.user.is_authenticated:
+        return redirect_to_dashboard(request.user)
+    
+    # Check for too many failed attempts
+    ip_address = get_client_ip(request)
+    failed_attempts = cache.get(f'failed_login_attempts_{ip_address}', 0)
+    
+    if failed_attempts >= 5:  # Lock after 5 failed attempts
+        messages.error(request, 'Too many failed login attempts. Please try again in 15 minutes.')
+        return render(request, 'accounts/login.html')
+    
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
         
+        if not username or not password:
+            messages.error(request, 'Please enter both username and password.')
+            return render(request, 'accounts/login.html')
+        
+        # Check if user exists and is active
+        try:
+            User = get_user_model()
+            user_obj = User.objects.filter(username=username).first()
+        except:
+            user_obj = None
+        
+        if not user_obj:
+            cache_failed_attempt(ip_address)
+            messages.error(request, 'Invalid username or password.')
+            return render(request, 'accounts/login.html')
+        
+        # Check if user is active
+        if not user_obj.is_active:
+            messages.error(request, 
+                'Your account has been deactivated. '
+                'Please contact the system administrator for assistance.'
+            )
+            return render(request, 'accounts/login.html')
+        
         user = authenticate(request, username=username, password=password)
-        if user is not None:
+        
+        if user is not None and user.is_active:
+            # Successful login - clear failed attempts
+            cache.delete(f'failed_login_attempts_{ip_address}')
+            
             login(request, user)
             messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
             
-            # Redirect based on role
-            if user.role == 'admin':
-                return redirect('admin_dashboard')
-            elif user.role == 'teacher':
-                return redirect('teacher_dashboard')
-            else:
-                return redirect('student_dashboard')
+            return redirect_to_dashboard(user)
         else:
+            # Failed login - increment counter
+            cache_failed_attempt(ip_address)
             messages.error(request, 'Invalid username or password.')
     
     return render(request, 'accounts/login.html')
+
 
 
 @login_required
@@ -83,7 +123,6 @@ def register_teacher(request):
         employment_type = data.get("employment_type", "full_time")
         is_class_teacher = data.get("is_class_teacher") == "on" or data.get("is_class_teacher") == "true"
         class_teacher_of_id = data.get("class_teacher_of")
-        subject_ids = data.getlist("subjects") if hasattr(data, 'getlist') else data.get("subjects", [])
 
         if not all([first_name, last_name, email]):
             return JsonResponse({
@@ -123,13 +162,6 @@ def register_teacher(request):
             is_class_teacher=is_class_teacher,
             class_teacher_of=ClassLevel.objects.filter(id=class_teacher_of_id).first() if class_teacher_of_id else None
         )
-        
-        if subject_ids:
-            if isinstance(subject_ids, str):
-                import ast
-                subject_ids = ast.literal_eval(subject_ids)
-            subjects = Subject.objects.filter(id__in=subject_ids)
-            teacher_profile.subjects.set(subjects)
         
         response_data = {
             'success': True,
@@ -286,7 +318,10 @@ def change_password(request, user_id):
 @login_required
 def teacher_list(request):
     """List all teachers with filtering and pagination"""
-    teachers = TeacherProfile.objects.select_related('user').prefetch_related('subjects')
+    teachers = TeacherProfile.objects.select_related('user').prefetch_related(
+        'subjects',
+        'user__class_levels_taught'
+    )
     
 
     emp_type = request.GET.get('employment_type')
@@ -1519,3 +1554,369 @@ def get_own_profile_data(request):
     
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+
+
+@login_required
+def admin_list(request):
+    """List all admin staff with filtering and pagination"""
+    # Get filter parameters
+    staff_type = request.GET.get('staff_type')
+    is_active = request.GET.get('is_active')
+    search = request.GET.get('search')
+    page = request.GET.get('page', 1)
+    
+    # Start with all admin staff
+    admins = StaffProfile.objects.select_related('user').filter(user__role='admin')
+    
+    # Apply filters
+    if staff_type:
+        admins = admins.filter(staff_type=staff_type)
+    
+    if is_active:
+        is_active_bool = is_active.lower() == 'true'
+        admins = admins.filter(user__is_active=is_active_bool)
+    
+    if search:
+        admins = admins.filter(
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search) |
+            Q(user__email__icontains=search) |
+            Q(staff_id__icontains=search) |
+            Q(user__username__icontains=search)
+        )
+    
+    # Get counts for stats
+    total_admins = StaffProfile.objects.filter(user__role='admin').count()
+    active_admins = StaffProfile.objects.filter(user__role='admin', user__is_active=True).count()
+    administrative_count = StaffProfile.objects.filter(user__role='admin', staff_type='administrative').count()
+    other_count = StaffProfile.objects.filter(user__role='admin', staff_type='other').count()
+    
+    # Pagination
+    paginator = Paginator(admins, 20)  # 20 items per page
+    admins_page = paginator.get_page(page)
+    
+    context = {
+        'admins': admins_page,
+        'total_admins': total_admins,
+        'active_admins': active_admins,
+        'administrative_count': administrative_count,
+        'other_count': other_count,
+        'current_filters': {
+            'staff_type': staff_type,
+            'is_active': is_active,
+            'search': search,
+        }
+    }
+    
+    return render(request, 'accounts/admin_list.html', context)
+
+
+
+@login_required
+def create_admin_page(request):
+    """Render the create admin staff page"""
+    return render(request, 'accounts/create_admin.html')
+
+
+
+@login_required
+@require_POST
+def create_admin(request):
+    """Create a new admin staff member"""
+    try:
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        staff_type = request.POST.get('staff_type')
+        phone_number = request.POST.get('phone_number')
+        date_of_birth = request.POST.get('date_of_birth')
+        gender = request.POST.get('gender')
+        emergency_contact_name = request.POST.get('emergency_contact_name')
+        emergency_contact_phone = request.POST.get('emergency_contact_phone')
+        profile_picture = request.FILES.get('profile_picture')
+
+        # Validate required fields
+        errors = {}
+        if not all([first_name, last_name, username, email, password, staff_type]):
+            errors['general'] = ['All required fields must be filled']
+
+        # Check if username already exists
+        if User.objects.filter(username=username).exists():
+            errors['username'] = ['Username already exists']
+
+        # Check if email already exists
+        if User.objects.filter(email=email).exists():
+            errors['email'] = ['Email already registered']
+
+        if errors:
+            return JsonResponse({'success': False, 'errors': errors}, status=400)
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            role='admin',  
+            phone_number=phone_number,
+            date_of_birth=date_of_birth,
+            gender=gender,
+            emergency_contact_name=emergency_contact_name,
+            emergency_contact_phone=emergency_contact_phone,
+            profile_picture=profile_picture
+        )
+
+        staff_id = generate_staff_id()
+
+        StaffProfile.objects.create(
+            user=user,
+            staff_id=staff_id,
+            staff_type=staff_type
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Admin staff {user.get_full_name()} created successfully',
+            'redirect_url': '/accounts/staff/'
+        })
+
+    except IntegrityError as e:
+        return JsonResponse({
+            'success': False,
+            'error': 'Database integrity error. Please check the provided information.'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'An error occurred: {str(e)}'
+        }, status=500)
+
+
+@login_required
+def check_username(request):
+    """Check if username is available"""
+
+    username = request.GET.get('username')
+    if not username:
+        return JsonResponse({'available': False})
+    
+    available = not User.objects.filter(username=username).exists()
+    return JsonResponse({'available': available})
+
+
+@login_required
+def check_email(request):
+    """Check if email is available"""
+
+    email = request.GET.get('email')
+    if not email:
+        return JsonResponse({'available': False})
+    
+    available = not User.objects.filter(email=email).exists()
+    return JsonResponse({'available': available})
+
+
+@login_required
+@require_POST
+def toggle_admin_status(request, admin_id):
+    """
+    Toggle admin active status (activate/deactivate)
+    """
+    try:
+        admin_profile = get_object_or_404(
+            StaffProfile.objects.select_related('user'),
+            id=admin_id,
+            user__role='admin'
+        )
+        
+        # Prevent self-deactivation
+        if admin_profile.user.id == request.user.id:
+            return JsonResponse({
+                'success': False,
+                'error': 'You cannot deactivate your own account'
+            }, status=400)
+        
+        # Toggle the active status
+        admin_profile.user.is_active = not admin_profile.user.is_active
+        admin_profile.user.save()
+        
+        action = 'activated' if admin_profile.user.is_active else 'deactivated'
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Admin {admin_profile.user.get_full_name()} has been {action} successfully',
+            'is_active': admin_profile.user.is_active,
+            'new_status': 'Active' if admin_profile.user.is_active else 'Inactive'
+        })
+        
+    except StaffProfile.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Admin staff member not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'An error occurred: {str(e)}'
+        }, status=500)
+
+
+
+@login_required
+@require_POST
+def activate_admin(request, admin_id):
+    """
+    Activate a specific admin
+    """
+    try:
+        admin_profile = get_object_or_404(
+            StaffProfile.objects.select_related('user'),
+            id=admin_id,
+            user__role='admin'
+        )
+        
+        # Check if already active
+        if admin_profile.user.is_active:
+            return JsonResponse({
+                'success': False,
+                'error': 'Admin is already active'
+            }, status=400)
+        
+        # Activate the admin
+        admin_profile.user.is_active = True
+        admin_profile.user.save()
+        
+        print(f"Admin {admin_profile.user.get_full_name()} activated by {request.user.get_full_name()}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Admin {admin_profile.user.get_full_name()} has been activated successfully',
+            'is_active': True,
+            'status': 'Active'
+        })
+        
+    except StaffProfile.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Admin staff member not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'An error occurred: {str(e)}'
+        }, status=500)
+
+
+
+@login_required
+@require_POST
+def deactivate_admin(request, admin_id):
+    """
+    Deactivate a specific admin
+    """
+    try:
+        admin_profile = get_object_or_404(
+            StaffProfile.objects.select_related('user'),
+            id=admin_id,
+            user__role='admin'
+        )
+        
+        # Prevent self-deactivation
+        if admin_profile.user.id == request.user.id:
+            return JsonResponse({
+                'success': False,
+                'error': 'You cannot deactivate your own account'
+            }, status=400)
+        
+        # Check if already inactive
+        if not admin_profile.user.is_active:
+            return JsonResponse({
+                'success': False,
+                'error': 'Admin is already inactive'
+            }, status=400)
+        
+        # Deactivate the admin
+        admin_profile.user.is_active = False
+        admin_profile.user.save()
+        
+        # Log the action
+        print(f"Admin {admin_profile.user.get_full_name()} deactivated by {request.user.get_full_name()}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Admin {admin_profile.user.get_full_name()} has been deactivated successfully',
+            'is_active': False,
+            'status': 'Inactive'
+        })
+        
+    except StaffProfile.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Admin staff member not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'An error occurred: {str(e)}'
+        }, status=500)
+
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def bulk_admin_status(request):
+    """
+    Bulk activate/deactivate admins
+    """
+    if request.method == 'POST':
+        try:
+            admin_ids = request.POST.getlist('admin_ids')
+            action = request.POST.get('action')  # 'activate' or 'deactivate'
+            
+            if not admin_ids:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No admin IDs provided'
+                }, status=400)
+            
+            if action not in ['activate', 'deactivate']:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid action. Use "activate" or "deactivate"'
+                }, status=400)
+            
+            admins = StaffProfile.objects.filter(
+                id__in=admin_ids,
+                user__role='admin'
+            ).select_related('user')
+            
+            # Filter out current user if deactivating
+            if action == 'deactivate':
+                admins = admins.exclude(user=request.user)
+            
+            updated_count = 0
+            for admin in admins:
+                admin.user.is_active = (action == 'activate')
+                admin.user.save()
+                updated_count += 1
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully {action}d {updated_count} admin(s)',
+                'updated_count': updated_count
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'An error occurred: {str(e)}'
+            }, status=500)
+    
+    # GET request - return form or info
+    return JsonResponse({
+        'message': 'Use POST method with admin_ids and action parameters'
+    })

@@ -1,7 +1,7 @@
 import showToast from "/static/scripts/JS/admin_d.js"
 
 document.getElementById("openModal").onclick = openModal
-document.querySelector(".closeModal").onclick = closeModal
+document.querySelectorAll(".closeModal").onclick = closeModal
 
 function openModal() {
     document.getElementById('teacherModal').classList.add('show');
@@ -18,6 +18,7 @@ document.getElementById('teacherModal').addEventListener('click', function(e) {
 });
 
 const colors = ['#2563eb', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899', '#ef4444'];
+
 document.querySelectorAll('.teacher-avatar').forEach((avatar, index) => {
     avatar.style.background = colors[index % colors.length];
 });

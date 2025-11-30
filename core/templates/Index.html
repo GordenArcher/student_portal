@@ -24,7 +24,6 @@
             padding: 0 24px;
         }
 
-        /* Header */
         .header {
             background: white;
             border-bottom: 1px solid #e5e5e5;
@@ -82,10 +81,6 @@
             transition: color 0.2s;
         }
 
-        .nav-links a:hover {
-            color: #1a56db;
-        }
-
         .btn {
             padding: 10px 20px;
             border-radius: 6px;
@@ -106,7 +101,8 @@
         }
 
         .btn-primary:hover {
-            background: #1e4bbb;
+            background: white;
+            color: blue;
         }
 
         .btn-outline {
@@ -148,7 +144,6 @@
             flex-wrap: wrap;
         }
 
-        /* Features Section */
         .features {
             padding: 80px 0;
             background: white;
@@ -208,7 +203,6 @@
             line-height: 1.5;
         }
 
-        /* Stats Section */
         .stats {
             padding: 80px 0;
             background: #f8fafc;
@@ -234,7 +228,6 @@
             font-size: 15px;
         }
 
-        /* Footer */
         .footer {
             background: #1a1a1a;
             color: white;
@@ -330,30 +323,28 @@
                     <div class="logo-icon">NS</div>
                     <div class="logo-text">New Star Academy</div>
                 </a>
+
                 <div class="nav-links">
-                    <a href="#features">Features</a>
-                    <a href="#about">About</a>
-                    <a href="#contact">Contact</a>
                     {% if user.is_authenticated %}
                         {% if user.role == 'admin' %}
-                            <a style="color: white;" href="{% url 'admin_dashboard' %}" class="btn btn-primary">
+                            <a href="{% url 'admin_dashboard' %}" class="btn btn-outline">
                                 <i class="bi bi-speedometer2"></i> Admin Dashboard
                             </a>
                         {% elif user.role == 'teacher' %}
-                            <a style="color: white;" href="{% url 'teacher_dashboard' %}" class="btn btn-primary">
+                            <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline">
                                 <i class="bi bi-speedometer2"></i> Teacher Dashboard
                             </a>
                         {% elif user.role == 'student' %}
-                            <a style="color: white;" href="{% url 'student_dashboard' %}" class="btn btn-primary">
+                            <a href="{% url 'student_dashboard' %}" class="btn btn-outline">
                                 <i class="bi bi-speedometer2"></i> Student Dashboard
                             </a>
                         {% else %}
-                            <a style="color: white;" href="{% url 'dashboard' %}" class="btn btn-primary">
+                            <a href="{% url 'dashboard' %}" class="btn btn-outline">
                                 <i class="bi bi-speedometer2"></i> Dashboard
                             </a>
                         {% endif %}
                     {% else %}
-                        <a style="color: white;" href="{% url 'login' %}" class="btn btn-outline">
+                        <a href="{% url 'login' %}" class="btn btn-outline">
                             <i class="bi bi-person-circle"></i> Login
                         </a>
                     {% endif %}
@@ -374,7 +365,7 @@
                 {% else %}
                     <a href="{% url 'login' %}" class="btn btn-primary">
                         <i class="bi bi-box-arrow-in-right"></i> Student Login
-                    </a>]
+                    </a>
                 {% endif %}
             </div>
         </div>
@@ -440,7 +431,6 @@
         </div>
     </section>
 
-    <!-- Footer -->
     <footer class="footer" id="contact">
         <div class="container">
             <div class="footer-grid">
@@ -451,16 +441,13 @@
                 </div>
                 <div class="footer-column">
                     <h4>Quick Links</h4>
-                    <a href="#features">Portal Features</a>
-                    <a href="#about">About School</a>
-                    <a href="#contact">Contact Us</a>
-                    <a href="{% url 'login' %}">Student Login</a>
+                    <a href="{% url 'login' %}">Login</a>
                 </div>
                 <div class="footer-column">
                     <h4>Contact</h4>
                     <a href="tel:+233123456789">+233 123 456 789</a>
                     <a href="mailto:info@newstaracademy.edu.gh">info@newstaracademy.edu.gh</a>
-                    <p style="color: #ccc; margin-top: 8px; font-size: 14px;">123 Education Avenue<br>Accra, Ghana</p>
+                    <p style="color: #ccc; margin-top: 8px; font-size: 14px;">Sowutuom, Isreal <br>Accra, Ghana</p>
                 </div>
             </div>
             <div class="footer-bottom">
@@ -469,7 +456,6 @@
         </div>
     </footer>
 
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 </body>
 </html>

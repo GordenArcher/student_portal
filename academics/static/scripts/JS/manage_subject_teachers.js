@@ -78,13 +78,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Show edit assignment modal
 function showEditAssignmentModal(assignmentId, classLevelId, academicYearId, teacherId) {
-    // Get current values from the form selects
-    const classSelect = document.querySelector('select[name="class_level_id"]');
-    const yearSelect = document.querySelector('select[name="academic_year_id"]');
-    const teacherSelect = document.querySelector('select[name="teacher_id"]');
+    // Find the table row that contains this assignment
+    const assignmentRow = document.querySelector(`.edit-assignment[data-assignment-id="${assignmentId}"]`).closest('tr');
     
-    const className = classSelect.querySelector(`option[value="${classLevelId}"]`)?.textContent || 'Unknown Class';
-    const yearName = yearSelect.querySelector(`option[value="${academicYearId}"]`)?.textContent || 'Unknown Year';
+    // Get class and year names directly from the table row
+    const className = assignmentRow.querySelector('td:first-child').textContent.trim();
+    const yearName = assignmentRow.querySelector('td:nth-child(2)').textContent.trim();
+    const teacherSelect = document.querySelector('select[name="teacher_id"]');
     const teacherName = teacherSelect.querySelector(`option[value="${teacherId}"]`)?.textContent || 'No Teacher';
     
     const modal = document.createElement('div');
@@ -172,7 +172,6 @@ async function updateAssignment(assignmentId, formData) {
     }
 }
 
-// Show delete confirmation
 function showDeleteConfirmation(assignmentId, className, yearName) {
     const modal = document.createElement('div');
     modal.className = 'confirmation-modal show';

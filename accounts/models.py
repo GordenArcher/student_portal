@@ -90,7 +90,6 @@ class TeacherProfile(models.Model):
     employee_id = models.CharField(max_length=20, unique=True, db_index=True)
     subjects = models.ManyToManyField(Subject, related_name='teachers', blank=True)
     employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_TYPE_CHOICES, default='full_time')
-    is_class_teacher = models.BooleanField(default=False)
     class_teacher_of = models.ForeignKey(
         ClassLevel, 
         on_delete=models.SET_NULL, 
@@ -123,6 +122,11 @@ class TeacherProfile(models.Model):
         return self.user.teacher_profile.subjects.aggregate(
             total_students=Count('classes__students', distinct=True)
         )['total_students'] or 0
+    
+    @property
+    def is_class_teacher(self):
+        """Check if teacher is a class teacher"""
+        return self.user.class_levels_taught.exists()
 
 
 class StudentProfile(models.Model):

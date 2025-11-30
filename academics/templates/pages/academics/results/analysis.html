@@ -9,7 +9,6 @@
 
 {% block content %}
 <main class="main-content">
-    <!-- Page Header -->
     <div class="page-header">
         <div class="header-top">
             <div class="page-title">
@@ -328,8 +327,6 @@
             {% endif %}
         </div>
     </div>
-
-    {{ context }}
 </main>
 {% endblock %}
 
@@ -343,5 +340,7 @@
         classPerformance: {{ context.class_performance|safe }},
         performanceTrends: {{ context.performance_trends|safe }}
     };
+
+    window.analysisData = analysisData;
 </script>
 {% endblock %}

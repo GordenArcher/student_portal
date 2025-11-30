@@ -37,7 +37,6 @@ function createGradeDistributionChart() {
     const ctx = document.getElementById('gradeDistributionChart');
     if (!ctx) return;
 
-    // Get data from the template (you would pass this from Django)
     const gradeData = getGradeDistributionData();
     
     new Chart(ctx, {
@@ -134,6 +133,11 @@ function createSubjectPerformanceChart() {
 
     const subjectData = getSubjectPerformanceData();
     
+    if (!subjectData.labels || subjectData.labels.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="empty-state"><p>No subject performance data available</p></div>';
+        return;
+    }
+    
     new Chart(ctx, {
         type: 'radar',
         data: {
@@ -216,6 +220,11 @@ function createClassPerformanceChart() {
     if (!ctx) return;
 
     const classData = getClassPerformanceData();
+    
+    if (!classData.labels || classData.labels.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="empty-state"><p>No class performance data available</p></div>';
+        return;
+    }
     
     new Chart(ctx, {
         type: 'bar',
@@ -332,62 +341,16 @@ function createPerformanceTrendsChart() {
 
     const trendData = getPerformanceTrendsData();
     
+    if (!trendData.periods || trendData.periods.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="empty-state"><p>No performance trends data available</p></div>';
+        return;
+    }
+    
     new Chart(ctx, {
         type: 'line',
         data: {
             labels: trendData.periods,
-            datasets: [
-                {
-                    label: 'Mathematics',
-                    data: trendData.math,
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointBackgroundColor: '#3b82f6',
-                    pointBorderColor: '#fff',
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                },
-                {
-                    label: 'English',
-                    data: trendData.english,
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointBackgroundColor: '#10b981',
-                    pointBorderColor: '#fff',
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                },
-                {
-                    label: 'Science',
-                    data: trendData.science,
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointBackgroundColor: '#f59e0b',
-                    pointBorderColor: '#fff',
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                },
-                {
-                    label: 'Overall Average',
-                    data: trendData.overall,
-                    borderColor: '#8b5cf6',
-                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                    tension: 0.4,
-                    borderWidth: 4,
-                    borderDash: [5, 5],
-                    pointBackgroundColor: '#8b5cf6',
-                    pointBorderColor: '#fff',
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    fill: false
-                }
-            ]
+            datasets: trendData.datasets
         },
         options: {
             responsive: true,
@@ -453,42 +416,126 @@ function createPerformanceTrendsChart() {
     });
 }
 
-// Data functions - In a real app, this data would come from Django
+// Data functions using real data from Django context
 function getGradeDistributionData() {
-    // This would be populated from Django context
-    // For now, using sample data
-    return {
-        labels: ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'E', 'F'],
-        data: [15, 42, 68, 55, 38, 25, 18, 12, 8, 5]
-    };
+    if (!window.analysisData || !window.analysisData.gradeDistribution) {
+        return { labels: [], data: [] };
+    }
+
+    const gradeOrder = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D+', 'D', 'E', 'F'];
+    const labels = [];
+    const data = [];
+
+    // Create a map of grade counts for easy lookup
+    const gradeMap = {};
+    window.analysisData.gradeDistribution.forEach(item => {
+        gradeMap[item.grade] = item.count;
+    });
+
+    // Populate data in the correct order
+    gradeOrder.forEach(grade => {
+        labels.push(grade);
+        data.push(gradeMap[grade] || 0);
+    });
+
+    return { labels, data };
 }
 
 function getSubjectPerformanceData() {
-    return {
-        labels: ['Mathematics', 'English', 'Science', 'Social Studies', 'ICT', 'French', 'Creative Arts', 'PE'],
-        data: [85, 78, 82, 75, 88, 70, 80, 85]
-    };
+    if (!window.analysisData || !window.analysisData.subjectPerformance) {
+        return { labels: [], data: [] };
+    }
+
+    const labels = [];
+    const data = [];
+
+    window.analysisData.subjectPerformance.forEach(subject => {
+        labels.push(subject.subject__name);
+        data.push(parseFloat(subject.avg_score) || 0);
+    });
+
+    return { labels, data };
 }
 
 function getClassPerformanceData() {
-    return {
-        labels: ['JHS 1A', 'JHS 1B', 'JHS 2A', 'JHS 2B', 'JHS 3A', 'JHS 3B', 'SHS 1', 'SHS 2'],
-        scores: [78.5, 82.3, 75.8, 80.2, 85.6, 79.1, 83.4, 87.2],
-        passRates: [85, 88, 82, 86, 92, 84, 89, 94]
-    };
+    if (!window.analysisData || !window.analysisData.classPerformance) {
+        return { labels: [], scores: [], passRates: [] };
+    }
+
+    const labels = [];
+    const scores = [];
+    const passRates = [];
+
+    window.analysisData.classPerformance.forEach(classItem => {
+        labels.push(classItem.class_level__name);
+        scores.push(parseFloat(classItem.avg_score) || 0);
+        passRates.push(parseFloat(classItem.pass_rate) || 0);
+    });
+
+    return { labels, scores, passRates };
 }
 
 function getPerformanceTrendsData() {
+    if (!window.analysisData || !window.analysisData.performanceTrends) {
+        return { periods: [], datasets: [] };
+    }
+
+    // Group by term and calculate averages for each subject
+    const trends = {};
+    const subjects = new Set();
+    const periods = new Set();
+
+    window.analysisData.performanceTrends.forEach(item => {
+        const periodKey = `${item.term__name} ${item.term__academic_year__name}`;
+        periods.add(periodKey);
+        subjects.add(item.subject__name);
+
+        if (!trends[periodKey]) {
+            trends[periodKey] = {};
+        }
+        trends[periodKey][item.subject__name] = parseFloat(item.avg_score) || 0;
+    });
+
+    // Convert to arrays
+    const periodArray = Array.from(periods);
+    const subjectArray = Array.from(subjects);
+
+    // Create datasets for each subject
+    const datasets = subjectArray.map(subject => {
+        const data = periodArray.map(period => trends[period][subject] || 0);
+        
+        // Assign colors based on subject
+        const colors = {
+            'Mathematics': { border: '#3b82f6', background: 'rgba(59, 130, 246, 0.1)' },
+            'English': { border: '#10b981', background: 'rgba(16, 185, 129, 0.1)' },
+            'Science': { border: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)' },
+            'Social Studies': { border: '#8b5cf6', background: 'rgba(139, 92, 246, 0.1)' },
+            'ICT': { border: '#ec4899', background: 'rgba(236, 72, 153, 0.1)' }
+        };
+
+        const color = colors[subject] || { border: '#64748b', background: 'rgba(100, 116, 139, 0.1)' };
+
+        return {
+            label: subject,
+            data: data,
+            borderColor: color.border,
+            backgroundColor: color.background,
+            tension: 0.4,
+            borderWidth: 3,
+            pointBackgroundColor: color.border,
+            pointBorderColor: '#fff',
+            pointRadius: 4,
+            pointHoverRadius: 6
+        };
+    });
+
     return {
-        periods: ['Term 1 2023', 'Term 2 2023', 'Term 3 2023', 'Term 1 2024', 'Term 2 2024', 'Term 3 2024'],
-        math: [75, 78, 82, 80, 85, 88],
-        english: [72, 75, 78, 76, 80, 82],
-        science: [78, 80, 82, 81, 83, 85],
-        overall: [75, 77, 80, 79, 82, 85]
+        periods: periodArray,
+        datasets: datasets
     };
 }
 
-// Export functionality
+// Rest of your existing functions remain the same...
 function initializeAnalysisEventListeners() {
     // Refresh button
     const refreshBtn = document.getElementById('refreshDataBtn');
@@ -504,33 +551,8 @@ function initializeAnalysisEventListeners() {
             exportAnalysis(format);
         });
     });
-    
-    // Keyboard shortcuts
-    document.addEventListener('keydown', function(e) {
-        // Ctrl + P for print
-        if (e.ctrlKey && e.key === 'p') {
-            e.preventDefault();
-            printAnalysisReport();
-        }
-        
-        // Ctrl + R for refresh
-        if (e.ctrlKey && e.key === 'r') {
-            e.preventDefault();
-            refreshAnalysisData();
-        }
-        
-        // Ctrl + E for export (opens dropdown)
-        if (e.ctrlKey && e.key === 'e') {
-            e.preventDefault();
-            const exportBtn = document.getElementById('exportDropdownBtn');
-            if (exportBtn) {
-                exportBtn.click();
-            }
-        }
-    });
 }
 
-// Remove the old refreshAnalysisData function and replace with this:
 async function refreshAnalysisData() {
     const refreshBtn = document.getElementById('refreshDataBtn');
     if (!refreshBtn) return;
@@ -540,11 +562,9 @@ async function refreshAnalysisData() {
     refreshBtn.disabled = true;
     
     try {
-        // Get current filters
         const filters = getCurrentFilters();
         let refreshUrl = window.location.pathname;
         
-        // Add current filters to refresh URL
         const params = new URLSearchParams();
         Object.keys(filters).forEach(key => {
             if (filters[key]) {
@@ -556,7 +576,6 @@ async function refreshAnalysisData() {
             refreshUrl += '?' + params.toString();
         }
         
-        // Reload the page with current filters
         window.location.href = refreshUrl;
         
     } catch (error) {
@@ -567,7 +586,6 @@ async function refreshAnalysisData() {
     }
 }
 
-// Update the exportAnalysis function to use the new approach
 async function exportAnalysis(format = 'pdf') {
     const filters = getCurrentFilters();
     let exportUrl = `/academics/results/analysis/export/?format=${format}`;
@@ -633,15 +651,115 @@ async function exportAnalysis(format = 'pdf') {
             exportDropdownBtn.innerHTML = '<i class="bi bi-download"></i> Export Report';
             exportDropdownBtn.disabled = false;
         }
-        
-        // Close dropdown after export
-        const dropdown = document.querySelector('.dropdown');
-        if (dropdown) {
-            dropdown.classList.remove('show');
-        }
     }
 }
 
+// Print functionality - uses browser's native print
+function printAnalysisReport() {
+    const originalTitle = document.title;
+    document.title = 'Academic Results Analysis Report - ' + new Date().toLocaleDateString();
+    
+    const printStyle = document.createElement('style');
+    printStyle.innerHTML = `
+        @media print {
+            /* Hide unnecessary elements */
+            .top-bar, 
+            .header-actions, 
+            .filters-card, 
+            .btn, 
+            .dropdown,
+            .search-box,
+            .user-profile,
+            .logout-btn,
+            .action-buttons {
+                display: none !important;
+            }
+            
+            /* Ensure content is visible and properly formatted */
+            .main-content {
+                margin: 0 !important;
+                padding: 20px !important;
+                width: 100% !important;
+            }
+            
+            /* Improve chart visibility for print */
+            .chart-container {
+                height: 250px !important;
+                page-break-inside: avoid;
+            }
+            
+            /* Better table formatting for print */
+            .table-responsive {
+                overflow: visible !important;
+            }
+            
+            /* Stats grid adjustment */
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr) !important;
+                gap: 15px !important;
+                margin-bottom: 20px !important;
+            }
+            
+            /* Card styling for print */
+            .card {
+                box-shadow: none !important;
+                border: 1px solid #ddd !important;
+                margin-bottom: 20px !important;
+                page-break-inside: avoid;
+            }
+            
+            /* Analysis grid adjustment */
+            .analysis-grid {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 15px !important;
+            }
+            
+            /* Ensure good contrast for print */
+            body {
+                color: #000 !important;
+                background: #fff !important;
+            }
+            
+            /* Page breaks */
+            .analysis-card, .card {
+                page-break-inside: avoid;
+            }
+            
+            /* Header for printed pages */
+            @page {
+                margin: 1cm;
+                @top-center {
+                    content: "Academic Results Analysis Report - New Start Academy";
+                    font-size: 12px;
+                    color: #666;
+                }
+                @bottom-center {
+                    content: "Page " counter(page) " of " counter(pages);
+                    font-size: 10px;
+                    color: #666;
+                }
+            }
+        }
+        
+        @media print and (color) {
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    `;
+    
+    document.head.appendChild(printStyle);
+    
+    window.print();
+    
+    setTimeout(() => {
+        document.title = originalTitle;
+        if (document.head.contains(printStyle)) {
+            document.head.removeChild(printStyle);
+        }
+    }, 500);
+}
 
 function getCurrentFilters() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -653,109 +771,6 @@ function getCurrentFilters() {
     
     return filters;
 }
-
-// Chart resize handler
-function handleChartResize() {
-    const charts = [
-        'gradeDistributionChart',
-        'subjectPerformanceChart', 
-        'classPerformanceChart',
-        'performanceTrendsChart'
-    ];
-    
-    charts.forEach(chartId => {
-        const chart = chart.getChart(chartId);
-        if (chart) {
-            chart.resize();
-        }
-    });
-}
-
-// Add resize listener
-window.addEventListener('resize', handleChartResize);
-
-// Print functionality
-function printAnalysisReport() {
-    const originalTitle = document.title;
-    document.title = 'Academic Results Analysis Report - ' + new Date().toLocaleDateString();
-    
-    window.print();
-    
-    // Restore original title
-    setTimeout(() => {
-        document.title = originalTitle;
-    }, 1000);
-}
-
-// Add keyboard shortcuts
-document.addEventListener('keydown', function(e) {
-    // Ctrl + P for print
-    if (e.ctrlKey && e.key === 'p') {
-        e.preventDefault();
-        printAnalysisReport();
-    }
-    
-    // Ctrl + R for refresh
-    if (e.ctrlKey && e.key === 'r') {
-        e.preventDefault();
-        refreshAnalysisData();
-    }
-    
-    // Ctrl + E for export
-    if (e.ctrlKey && e.key === 'e') {
-        e.preventDefault();
-        exportAnalysis('pdf');
-    }
-});
-
-// Initialize tooltips for chart elements
-function initializeChartTooltips() {
-    const chartContainers = document.querySelectorAll('.chart-container');
-    
-    chartContainers.forEach(container => {
-        container.addEventListener('mouseenter', function() {
-            this.style.cursor = 'crosshair';
-        });
-        
-        container.addEventListener('mouseleave', function() {
-            this.style.cursor = 'default';
-        });
-    });
-}
-
-// Enhanced data validation
-function validateChartData(data) {
-    if (!data || typeof data !== 'object') {
-        console.error('Invalid chart data provided');
-        return false;
-    }
-    
-    // Check for required properties based on chart type
-    const requiredProps = {
-        'gradeDistribution': ['labels', 'data'],
-        'subjectPerformance': ['labels', 'data'],
-        'classPerformance': ['labels', 'scores', 'passRates'],
-        'performanceTrends': ['periods', 'math', 'english', 'science', 'overall']
-    };
-    
-    return true; // Simplified validation
-}
-
-// Performance monitoring
-function monitorChartPerformance() {
-    const observer = new PerformanceObserver((list) => {
-        list.getEntries().forEach((entry) => {
-            if (entry.entryType === 'measure') {
-                console.log(`Chart ${entry.name} took ${entry.duration}ms to render`);
-            }
-        });
-    });
-    
-    observer.observe({ entryTypes: ['measure'] });
-}
-
-// Initialize performance monitoring in development
-monitorChartPerformance();
 
 window.ResultsAnalysis = {
     refreshData: refreshAnalysisData,

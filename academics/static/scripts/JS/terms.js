@@ -7,17 +7,17 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeTermsPage();
 });
 
+
+
 function initializeTermsPage() {
     // Load initial data
     loadTerms();
     
-    // Event listeners
     document.getElementById('academicYearFilter').addEventListener('change', applyFilters);
     document.getElementById('statusFilter').addEventListener('change', applyFilters);
     document.getElementById('searchInput').addEventListener('input', debounce(applyFilters, 300));
     document.getElementById('refreshBtn').addEventListener('click', loadTerms);
     
-    // Modal event listeners
     initializeModals();
 }
 
@@ -42,10 +42,12 @@ async function loadTerms(page = 1) {
     paginationContainer.style.display = 'none';
     
     try {
-        const params = new URLSearchParams({
-            page: page,
-            ...currentFilters
+        const params = new URLSearchParams({ page });
+
+        Object.entries(currentFilters).forEach(([key, value]) => {
+            if (value !== "") params.append(key, value);
         });
+
         
         const response = await fetch(`/academics/api/terms/?${params}`);
         const data = await response.json();
@@ -131,7 +133,6 @@ function displayTerms(terms) {
 }
 
 function attachActionListeners() {
-    // Edit buttons
     document.querySelectorAll('.edit-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const termData = JSON.parse(this.getAttribute('data-term-data'));
@@ -156,6 +157,9 @@ function attachActionListeners() {
     });
 }
 
+const editTermModalEl = document.getElementById('editTermModal');
+const editTermModal = new bootstrap.Modal(editTermModalEl);
+
 function openEditModal(termData) {
     document.getElementById('editTermId').value = termData.id;
     document.getElementById('editName').value = termData.name;
@@ -163,10 +167,16 @@ function openEditModal(termData) {
     document.getElementById('editStartDate').value = termData.start_date;
     document.getElementById('editEndDate').value = termData.end_date;
     document.getElementById('editIsCurrent').checked = termData.is_current;
-    
-    const modal = new bootstrap.Modal(document.getElementById('editTermModal'));
-    modal.show();
+
+    editTermModal.show();
 }
+
+document.getElementById("closeDeleteBtn").addEventListener("click", () => {
+    editTermModal.hide();
+});
+
+
+
 
 function openDeleteModal(termId, termName) {
     document.getElementById('deleteConfirmMessage').textContent = 
@@ -297,15 +307,20 @@ async function confirmSetCurrentTerm() {
 }
 
 function applyFilters() {
-    currentFilters = {
-        academic_year: document.getElementById('academicYearFilter').value,
-        status: document.getElementById('statusFilter').value,
-        search: document.getElementById('searchInput').value
-    };
-    
+    const academicYear = document.getElementById('academicYearFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const search = document.getElementById('searchInput').value;
+
+    currentFilters = {};
+
+    if (academicYear) currentFilters.academic_year = academicYear;
+    if (status) currentFilters.status = status;
+    if (search) currentFilters.search = search;
+
     currentPage = 1;
     loadTerms(currentPage);
 }
+
 
 function displayPagination(pagination) {
     const container = document.getElementById('paginationContainer');

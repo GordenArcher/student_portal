@@ -792,6 +792,8 @@ def assign_teacher_to_class(request, class_id):
             'error': f'An error occurred while assigning teacher: {str(e)}'
         }, status=400)
     
+
+    
 # @login_required
 # @require_http_methods(["POST"])
 # def assign_teacher_to_subject(request, subject_id):
@@ -1351,6 +1353,20 @@ def publish_results(request, result_id=None):
 @login_required
 def result_detail(request, result_id):
     """Detailed view of a single result"""
+
+    user = request.user
+    
+     # Determine which base template to use based on role
+
+    if user.role == 'admin':
+        base_template = 'base/admin_d.html'
+    elif user.role == 'teacher':
+        base_template = 'base/teacher_d.html'
+    elif user.role == 'student':
+        base_template = 'base/student_d.html'
+    else:
+        base_template = 'base/admin_d.html'
+            
     result = get_object_or_404(
         Result.objects.select_related(
             'student', 'subject', 'class_level', 'term', 'uploaded_by'
@@ -1369,6 +1385,7 @@ def result_detail(request, result_id):
     
     context = {
         'result': result,
+        'base_template': base_template
     }
     
     return render(request, 'pages/academics/results/detail.html', {'context': context})
@@ -1401,17 +1418,19 @@ def delete_result(request, result_id):
         }, status=400)
 
 
+
 @login_required
 def results_analysis(request):
     """Advanced results analysis"""
-    # Get filter parameters
+
     academic_year_id = request.GET.get('academic_year')
     class_level_id = request.GET.get('class_level')
     term_id = request.GET.get('term')
     
-    results = Result.objects.all()
+    results = Result.objects.select_related(
+        'student', 'subject', 'class_level', 'term', 'term__academic_year'
+    ).filter(is_published=True)
     
-    # Apply filters
     if academic_year_id:
         results = results.filter(term__academic_year_id=academic_year_id)
     if class_level_id:
@@ -1420,37 +1439,81 @@ def results_analysis(request):
         results = results.filter(term_id=term_id)
     
     # Comprehensive analysis
-    # Grade distribution
     grade_distribution = results.values('grade').annotate(
         count=Count('id')
     ).order_by('grade')
     
-    # Subject performance trends
-    subject_trends = results.values(
-        'subject__name',
-        'term__name',
-        'term__academic_year__name'
-    ).annotate(
-        avg_score=Avg('score'),
-        student_count=Count('student', distinct=True)
-    ).order_by('subject__name', 'term__academic_year__name', 'term__name')
+    # Subject performance (average scores per subject)
+    subject_performance = results.values('subject__name').annotate(
+        avg_score=Avg('score')
+    ).order_by('-avg_score')
     
-    # Class performance comparison
     class_performance = results.values('class_level__name').annotate(
         avg_score=Avg('score'),
         total_students=Count('student', distinct=True),
         pass_rate=Count('id', filter=Q(score__gte=50)) * 100.0 / Count('id')
     ).order_by('-avg_score')
     
-    # Top performers cut by 10
+    performance_trends = results.values(
+        'subject__name',
+        'term__name',
+        'term__academic_year__name'
+    ).annotate(
+        avg_score=Avg('score'),
+        student_count=Count('student', distinct=True)
+    ).order_by('term__academic_year__name', 'term__name', 'subject__name')
+    
     top_performers = results.select_related('student', 'subject').order_by('-score')[:10]
+    
+    # Convert Decimal to float for JSON serialization
+    from decimal import Decimal
+    
+    subject_performance_list = []
+    for item in subject_performance:
+        subject_performance_list.append({
+            'subject__name': item['subject__name'],
+            'avg_score': float(item['avg_score']) if isinstance(item['avg_score'], Decimal) else item['avg_score']
+        })
+    
+    class_performance_list = []
+    for item in class_performance:
+        class_performance_list.append({
+            'class_level__name': item['class_level__name'],
+            'avg_score': float(item['avg_score']) if isinstance(item['avg_score'], Decimal) else item['avg_score'],
+            'total_students': item['total_students'],
+            'pass_rate': float(item['pass_rate']) if isinstance(item['pass_rate'], Decimal) else item['pass_rate']
+        })
+    
+    # Convert performance_trends
+    performance_trends_list = []
+    for item in performance_trends:
+        performance_trends_list.append({
+            'subject__name': item['subject__name'],
+            'term__name': item['term__name'],
+            'term__academic_year__name': item['term__academic_year__name'],
+            'avg_score': float(item['avg_score']) if isinstance(item['avg_score'], Decimal) else item['avg_score'],
+            'student_count': item['student_count']
+        })
+    
+    academic_years = AcademicYear.objects.all()
+    class_levels = ClassLevel.objects.all()
+    terms = Term.objects.all()
     
     context = {
         'grade_distribution': list(grade_distribution),
-        'subject_trends': list(subject_trends),
-        'class_performance': list(class_performance),
+        'subject_performance': subject_performance_list,
+        'class_performance': class_performance_list,
+        'performance_trends': performance_trends_list,
         'top_performers': top_performers,
         'total_results_analyzed': results.count(),
+        'academic_years': academic_years,
+        'class_levels': class_levels,
+        'terms': terms,
+        'current_filters': {
+            'academic_year_id': academic_year_id,
+            'class_level_id': class_level_id,
+            'term_id': term_id,
+        }
     }
     
     return render(request, 'pages/academics/results/analysis.html', {'context': context})
@@ -1995,20 +2058,26 @@ def terms_list(request):
 
 @login_required
 def api_terms_list(request):
-    """
-    API endpoint for terms list with filtering and pagination
-    """
     try:
-        academic_year_id = request.GET.get('academic_year')
+        academic_year_id = request.GET.get('academic_year') or None
         status_filter = request.GET.get('status')
         search_query = request.GET.get('search', '')
-        page_number = int(request.GET.get('page', 1))
+        page_number = request.GET.get('page', 1)
+
+        # Fix page_number errors
+        try:
+            page_number = int(page_number)
+        except:
+            page_number = 1
         
         terms = Term.objects.select_related('academic_year').all()
-        
-        if academic_year_id:
-            terms = terms.filter(academic_year_id=academic_year_id)
-        
+
+        # Safe check for academic_year
+        if academic_year_id not in [None, ""] and academic_year_id.isdigit():
+            terms = terms.filter(academic_year_id=int(academic_year_id))
+
+
+        # Status filters
         if status_filter:
             today = timezone.now().date()
             if status_filter == 'current':
@@ -2019,31 +2088,31 @@ def api_terms_list(request):
                 terms = terms.filter(end_date__lt=today)
             elif status_filter == 'active':
                 terms = terms.filter(start_date__lte=today, end_date__gte=today)
-        
+
+        # Search filter
         if search_query:
             terms = terms.filter(
                 Q(name__icontains=search_query) |
                 Q(academic_year__name__icontains=search_query)
             )
-        
-        # Order by start date (most recent first)
+
         terms = terms.order_by('-start_date')
-        
-        paginator = Paginator(terms, 10)  # 10 items per page
+
+        paginator = Paginator(terms, 10)
         page_obj = paginator.get_page(page_number)
-        
+
         terms_data = []
         for term in page_obj:
             terms_data.append({
                 'id': term.id,
                 'name': term.name,
-                'academic_year_id': term.academic_year.id,
-                'academic_year_name': term.academic_year.name,
+                'academic_year_id': term.academic_year.id if term.academic_year else None,
+                'academic_year_name': term.academic_year.name if term.academic_year else None,
                 'start_date': term.start_date.isoformat(),
                 'end_date': term.end_date.isoformat(),
                 'is_current': term.is_current,
             })
-        
+
         pagination_data = {
             'current_page': page_obj.number,
             'total_pages': paginator.num_pages,
@@ -2053,18 +2122,17 @@ def api_terms_list(request):
             'start_index': page_obj.start_index(),
             'end_index': page_obj.end_index(),
         }
-        
+
         return JsonResponse({
             'success': True,
             'terms': terms_data,
             'pagination': pagination_data
         })
-        
+
     except Exception as e:
-        # logger.error(f"Error in api_terms_list: {str(e)}")
         return JsonResponse({
             'success': False,
-            'error': 'Failed to load terms'
+            'error': str(e)  # show the error for debugging
         }, status=500)
 
 

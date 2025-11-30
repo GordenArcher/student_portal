@@ -1,5 +1,6 @@
 import showToast from "/static/scripts/JS/admin_d.js"
-
+import hideLoader from "/static/scripts/JS/admin_d.js"
+import showLoader from "/static/scripts/JS/admin_d.js"
 
 // Dropdown functionality
 document.addEventListener('click', function(e) {
@@ -533,24 +534,6 @@ async function updateStudentPassword(studentId, formData) {
 function getCsrfToken() {
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
     return csrfToken ? csrfToken.value : '';
-}
-
-function showLoader() {
-    const loader = document.createElement('div');
-    loader.className = 'modal show';
-    loader.innerHTML = `
-        <div class="modal-content" style="text-align: center; max-width: 200px;">
-            <div class="loader-spinner"></div>
-            <p>Loading...</p>
-        </div>
-    `;
-    loader.id = 'loader-modal';
-    document.body.appendChild(loader);
-}
-
-function hideLoader() {
-    const loader = document.getElementById('loader-modal');
-    if (loader) loader.remove();
 }
 
 // Event listeners for action buttons

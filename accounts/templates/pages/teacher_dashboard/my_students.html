@@ -1,6 +1,8 @@
 {% extends "base/teacher_d.html" %}
 {% load static %}
 
+{% load number_format %}
+
 {% block title %}My Students - Teacher Portal{% endblock %}
 
 {% block extra_css %}
@@ -26,12 +28,12 @@
             <div class="filter-grid">
                 <div class="filter-group">
                     <label>Filter by Class</label>
-                    <select name="class" class="form-control" onchange="this.form.submit()">
+                    <select title="select class" name="class" class="form-control" onchange="this.form.submit()">
                         <option value="">All Classes</option>
                         {% for class in classes_taught %}
-                        <option value="{{ class.id }}" {% if current_class_filter == class.id|stringformat:"s" %}selected{% endif %}>
-                            {{ class.name }}
-                        </option>
+                            <option value="{{ class.id }}" {% if current_class_filter == class.id|stringformat:"s" %}selected{% endif %}>
+                                {{ class.name }}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
@@ -83,7 +85,6 @@
             <div class="student-stats">
                 <div class="stat">
                     <small>Average Score</small>
-                    <!--  -->
                 </div>
                 <div class="stat">
                     <small>Results</small>

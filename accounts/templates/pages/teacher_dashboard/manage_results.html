@@ -15,6 +15,7 @@
             <h1>📊 Results Management</h1>
             <p>Upload and manage student results for your subjects</p>
         </div>
+        
         <a href="{% url 'upload_results' %}" class="btn btn-primary header-actions" data-bs-toggle="modal" data-bs-target="#uploadModal">
             <i class="bi bi-cloud-upload"></i> Upload New Result
         </a>
@@ -147,12 +148,22 @@
                                         <span class="upload-date">{{ result.date_uploaded|date:"M d, Y" }}</span>
                                     </td>
                                     <td>
-                                        <div class="action-buttons">
-                                            <button class="btn btn-sm btn-outline-danger delete-result" 
-                                                    data-result-id="{{ result.id }}"
-                                                    title="Delete Result">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
+                                        <div style="display: flex; align-items: center; gap: 2px;">
+                                            <div class="action-buttons">
+                                                <button class="btn btn-sm btn-outline-danger delete-result" 
+                                                        data-result-id="{{ result.id }}"
+                                                        title="Delete Result">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+
+                                            <div class="action-buttons">
+                                                <a href="{% url 'result_detail' result.id%}" class="btn btn-sm btn-outline-primary view-result" 
+                                                        data-result-id="{{ result.id }}"
+                                                        title="View Result">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>

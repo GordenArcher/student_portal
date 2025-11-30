@@ -17,6 +17,11 @@ def home_page(request):
     return render(request, "Index.html")
 
 
+def contact_page(request):
+
+    return render(request, "contact.html")
+
+
 
 def get_recent_activities(limit=10):
     """Build a recent activity feed dynamically."""
