@@ -58,8 +58,6 @@ urlpatterns = [
     path('api/profile/', views.get_own_profile_data, name='get_own_profile'),
     path('api/profile/update/', views.update_profile, name='update_profile'),
     path('api/profile/change-password/', views.change_own_password, name='change_own_password'),
-
-
     path('create-admin/1.80/:200/~/gorden/!~/add/', views.create_admin_page, name='create_admin_page'),
     path('create-admin/', views.create_admin, name='create_admin'),
     path('admin-list/', views.admin_list, name='admin_list'),
