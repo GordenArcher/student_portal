@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     showToast(data.message, 'success');
                     setTimeout(() => {
-                        // window.location.reload()
+                        window.location.reload()
                     }, 1500);
                 } else {
                     if (data.errors) {

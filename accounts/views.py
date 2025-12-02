@@ -159,7 +159,6 @@ def register_teacher(request):
             user=user,
             employee_id=employee_id,
             employment_type=employment_type,
-            is_class_teacher=is_class_teacher,
             class_teacher_of=ClassLevel.objects.filter(id=class_teacher_of_id).first() if class_teacher_of_id else None
         )
         
