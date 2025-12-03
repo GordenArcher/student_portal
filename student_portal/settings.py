@@ -26,7 +26,13 @@ SECRET_KEY = 'django-insecure-_2bwhpq@jw^i30a)ir5p=x73)_(9h&^%19ah06xp+y!-ktae$8
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["newstaracademy.pythonanywhere.com", "http://newstaracademy.org", "localhost"]
+ALLOWED_HOSTS = [
+    "newstaracademy.pythonanywhere.com",
+    "newstaracademy.org",
+    "www.newstaracademy.org",
+    "localhost"
+]
+
 
 
 # Application definition
