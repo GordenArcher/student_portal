@@ -23,67 +23,58 @@ from .utils.cache_failed_attempt import cache_failed_attempt
 from .utils.get_client_ip import get_client_ip
 
 
+LOCKOUT_THRESHOLD = 5      # Max failed attempts
+LOCKOUT_TIMEOUT = 900      # 15 minutes in seconds
+
 
 @require_http_methods(["GET", "POST"])
 def login_view(request):
-    """User login with brute force protection"""
+    """User login with brute-force protection"""
     
     if request.user.is_authenticated:
         return redirect_to_dashboard(request.user)
-    
-    # Check for too many failed attempts
+
     ip_address = get_client_ip(request)
     failed_attempts = cache.get(f'failed_login_attempts_{ip_address}', 0)
-    
-    if failed_attempts >= 5:  # Lock after 5 failed attempts
+
+    if failed_attempts >= LOCKOUT_THRESHOLD:
         messages.error(request, 'Too many failed login attempts. Please try again in 15 minutes.')
         return render(request, 'accounts/login.html')
-    
+
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+
         if not username or not password:
             messages.error(request, 'Please enter both username and password.')
             return render(request, 'accounts/login.html')
-        
-        # Check if user exists and is active
-        try:
-            User = get_user_model()
-            user_obj = User.objects.filter(username=username).first()
-        except:
-            user_obj = None
-        
+
+        user_obj = User.objects.filter(username=username).first()
+
         if not user_obj:
             cache_failed_attempt(ip_address)
             messages.error(request, 'Invalid username or password.')
             return render(request, 'accounts/login.html')
-        
-        # Check if user is active
-        if not user_obj.is_active:
-            messages.error(request, 
-                'Your account has been deactivated. '
-                'Please contact the system administrator for assistance.'
-            )
-            return render(request, 'accounts/login.html')
-        
-        user = authenticate(request, username=username, password=password)
-        
-        if user is not None and user.is_active:
-            # Successful login - clear failed attempts
-            cache.delete(f'failed_login_attempts_{ip_address}')
-            
-            login(request, user)
-            messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
-            
-            return redirect_to_dashboard(user)
-        else:
-            # Failed login - increment counter
-            cache_failed_attempt(ip_address)
-            messages.error(request, 'Invalid username or password.')
-    
-    return render(request, 'accounts/login.html')
 
+        if not user_obj.is_active:
+            messages.error(request, 'Your account has been deactivated. Please contact the system administrator.')
+            return render(request, 'accounts/login.html')
+
+        user = authenticate(request, username=username, password=password)
+
+        if user is None:
+            attempts = cache_failed_attempt(ip_address)
+            remaining = max(0, LOCKOUT_THRESHOLD - attempts)
+            messages.error(request, f'Invalid username or password. {remaining} attempts remaining.')
+            return render(request, 'accounts/login.html')
+
+        # Successful login
+        cache.delete(f'failed_login_attempts_{ip_address}')
+        login(request, user)
+        messages.success(request, f'Welcome back, {user.get_full_name() or user.username}!')
+        return redirect_to_dashboard(user)
+
+    return render(request, 'accounts/login.html')
 
 
 @login_required
@@ -93,8 +84,6 @@ def logout_view(request):
     messages.success(request, 'You have been logged out successfully.')
     return redirect('login')
 
-
-# ============ User Management Views ============
 
 def is_admin(user):
     return user.is_authenticated and user.role == 'admin'
