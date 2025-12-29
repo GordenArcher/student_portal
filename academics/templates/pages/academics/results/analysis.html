@@ -44,9 +44,8 @@
         </div>
     </div>
 
-    <!-- Filters -->
     <div class="filters-card">
-        <h3>📈 Analysis Filters</h3>
+        <h3><i class="bi bi-funnel"></i> Analysis Filters</h3>
         <form method="get" class="filters-form">
             <div class="filter-grid">
                 <div class="filter-group">
@@ -153,9 +152,7 @@
         </div>
     </div>
 
-    <!-- Charts Grid -->
     <div class="analysis-grid">
-        <!-- Grade Distribution -->
         <div class="analysis-card">
             <h4>Grade Distribution</h4>
             <div class="chart-container">
@@ -188,7 +185,7 @@
     <div class="content-grid" style="margin-top: 24px;">
         <div class="card">
             <div class="card-header">
-                <h3>🏆 Top Performers</h3>
+                <h3><i class="bi bi-trophy"></i> Top Performers</h3>
             </div>
             <div class="card-body">
                 {% if context.top_performers %}
@@ -227,7 +224,7 @@
 
         <div class="card">
             <div class="card-header">
-                <h3>📊 Class Performance</h3>
+                <h3><i class="bi bi-bar-chart"></i> Class Performance</h3>
             </div>
             <div class="card-body">
                 {% if context.class_performance %}
@@ -274,7 +271,7 @@
 
     <div class="card" style="margin-top: 24px;">
         <div class="card-header">
-            <h3>📋 Grade Distribution Details</h3>
+            <h3><i class="bi bi-pie-chart"></i> Grade Distribution Details</h3>
         </div>
         <div class="card-body">
             {% if context.grade_distribution %}

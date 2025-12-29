@@ -1051,27 +1051,22 @@ def student_dashboard(request):
     
     student_profile = get_object_or_404(StudentProfile, user=request.user)
     
-    # Get filter parameters
     academic_year_id = request.GET.get('academic_year')
     term_id = request.GET.get('term')
     
-    # Base queryset for results
     results = Result.objects.filter(
         student=request.user,
         is_published=False
     ).select_related('subject', 'class_level', 'term', 'term__academic_year')
     
-    # Apply filters
     if academic_year_id:
         results = results.filter(term__academic_year_id=academic_year_id)
     if term_id:
         results = results.filter(term_id=term_id)
     
-    # Get available filters
     academic_years = AcademicYear.objects.all().order_by('-start_date')
     terms = Term.objects.all().order_by('-academic_year', 'start_date')
     
-    # Group results by term
     results_by_term = {}
     for result in results:
         term_key = f"{result.term.name} - {result.term.academic_year.name}"
@@ -1231,7 +1226,7 @@ def my_classes(request):
 @login_required
 def my_students(request):
     teacher_profile = get_object_or_404(TeacherProfile, user=request.user)
-    teacher_user = teacher_profile.user  # Use User instance
+    teacher_user = teacher_profile.user 
 
     # Students the teacher actually teaches
     students = StudentProfile.objects.filter(
@@ -1311,12 +1306,11 @@ def student_results_ajax(request, student_id):
         # Get subjects through ClassSubject
         class_subjects = ClassSubject.objects.filter(
             class_level=student_class,
-            teacher=request.user  # Use User object here
+            teacher=request.user 
         )
 
         teacher_subject_ids = class_subjects.values_list('subject_id', flat=True)
 
-        # Get results
         results = Result.objects.filter(
             student=student_profile.user,
             subject_id__in=teacher_subject_ids,
@@ -1371,7 +1365,6 @@ def update_profile(request):
         user = request.user
         data = json.loads(request.body)
         
-        # Update basic user fields
         user.first_name = data.get('first_name', user.first_name)
         user.last_name = data.get('last_name', user.last_name)
         user.email = data.get('email', user.email)
@@ -1379,7 +1372,6 @@ def update_profile(request):
         user.date_of_birth = data.get('date_of_birth', user.date_of_birth)
         user.gender = data.get('gender', user.gender)
         
-        # Update profile-specific fields based on role
         if user.role == 'teacher' and hasattr(user, 'teacher_profile'):
             teacher_profile = user.teacher_profile
             teacher_profile.employment_type = data.get('employment_type', teacher_profile.employment_type)
@@ -1558,7 +1550,6 @@ def admin_list(request):
     # Start with all admin staff
     admins = StaffProfile.objects.select_related('user').filter(user__role='admin')
     
-    # Apply filters
     if staff_type:
         admins = admins.filter(staff_type=staff_type)
     
@@ -1575,13 +1566,11 @@ def admin_list(request):
             Q(user__username__icontains=search)
         )
     
-    # Get counts for stats
     total_admins = StaffProfile.objects.filter(user__role='admin').count()
     active_admins = StaffProfile.objects.filter(user__role='admin', user__is_active=True).count()
     administrative_count = StaffProfile.objects.filter(user__role='admin', staff_type='administrative').count()
     other_count = StaffProfile.objects.filter(user__role='admin', staff_type='other').count()
     
-    # Pagination
     paginator = Paginator(admins, 20)  # 20 items per page
     admins_page = paginator.get_page(page)
     
@@ -1728,7 +1717,6 @@ def toggle_admin_status(request, admin_id):
                 'error': 'You cannot deactivate your own account'
             }, status=400)
         
-        # Toggle the active status
         admin_profile.user.is_active = not admin_profile.user.is_active
         admin_profile.user.save()
         
@@ -1774,7 +1762,6 @@ def activate_admin(request, admin_id):
                 'error': 'Admin is already active'
             }, status=400)
         
-        # Activate the admin
         admin_profile.user.is_active = True
         admin_profile.user.save()
         
@@ -1820,19 +1807,15 @@ def deactivate_admin(request, admin_id):
                 'error': 'You cannot deactivate your own account'
             }, status=400)
         
-        # Check if already inactive
+        
         if not admin_profile.user.is_active:
             return JsonResponse({
                 'success': False,
                 'error': 'Admin is already inactive'
             }, status=400)
         
-        # Deactivate the admin
         admin_profile.user.is_active = False
         admin_profile.user.save()
-        
-        # Log the action
-        print(f"Admin {admin_profile.user.get_full_name()} deactivated by {request.user.get_full_name()}")
         
         return JsonResponse({
             'success': True,
@@ -1904,7 +1887,6 @@ def bulk_admin_status(request):
                 'error': f'An error occurred: {str(e)}'
             }, status=500)
     
-    # GET request - return form or info
     return JsonResponse({
         'message': 'Use POST method with admin_ids and action parameters'
     })

@@ -40,7 +40,7 @@ def get_recent_activities(limit=10):
             'title': 'Results uploaded',
             'details': f"{result.subject.name} - {result.class_level.name}",
             'time': timesince(result.date_uploaded, timezone.now()) + " ago",
-            'icon': '📝',
+            'icon': 'bi-upload',
             'color': '#dbeafe'
         })
 
@@ -51,7 +51,7 @@ def get_recent_activities(limit=10):
             'title': 'New student enrolled',
             'details': f"{student.user.get_full_name()} - {student.current_class.name if student.current_class else 'N/A'}",
             'time': timesince(student.created_at, timezone.now()) + " ago",
-            'icon': '✅',
+            'icon': 'bi-person-plus',
             'color': '#d1fae5'
         })
 
@@ -63,7 +63,7 @@ def get_recent_activities(limit=10):
                 'title': 'Teacher assigned',
                 'details': f"{cs.teacher.get_full_name()} to {cs.subject.name} ({cs.class_level.name})",
                 'time': "recently",  # You can add timestamp if you track assignment creation
-                'icon': '👨‍🏫',
+                'icon': 'bi-person-badge',
                 'color': '#ede9fe'
             })
 
@@ -104,13 +104,13 @@ def get_teacher_workload():
         workload_list = [teacher for teacher in workload_list if teacher['total_assignments'] > 0]
         
         if workload_list:
-            print(f"✅ Method 1 successful: Found {len(workload_list)} teachers with assignments")
+            print(f" Method 1 successful: Found {len(workload_list)} teachers with assignments")
             print(workload_list)
             return workload_list
         else:
-            print("⚠️ Method 1: No teachers with assignments found")
+            print(" Method 1: No teachers with assignments found")
     except Exception as e:
-        print(f"❌ Method 1 failed: {e}")
+        print(f" Method 1 failed: {e}")
     
     # Method 2: Direct query from ClassSubject (most reliable)
     try:
@@ -119,7 +119,7 @@ def get_teacher_workload():
             teacher__is_active=True
         ).select_related('teacher', 'subject', 'class_level')
         
-        print(f"🔍 Method 2: Found {class_assignments.count()} ClassSubject records with teachers")
+        print(f"Method 2: Found {class_assignments.count()} ClassSubject records with teachers")
         
         workload_data = defaultdict(lambda: {
             'id': None,
@@ -154,13 +154,13 @@ def get_teacher_workload():
         result = sorted(result, key=lambda x: x['total_assignments'], reverse=True)[:6]
         
         if result:
-            print(f"✅ Method 2 successful: Found {len(result)} teachers with assignments")
+            print(f" Method 2 successful: Found {len(result)} teachers with assignments")
             return result
         else:
-            print("⚠️ Method 2: No teachers with assignments found")
+            print(" Method 2: No teachers with assignments found")
             
     except Exception as e:
-        print(f"❌ Method 2 failed: {e}")
+        print(f" Method 2 failed: {e}")
     
     # Method 3: Fallback - check if there are any ClassSubject records at all
     try:
@@ -168,7 +168,7 @@ def get_teacher_workload():
         class_subjects_with_teachers = ClassSubject.objects.filter(teacher__isnull=False).count()
         total_teachers = User.objects.filter(role='teacher', is_active=True).count()
         
-        print(f"📊 Debug Info:")
+        print(f" Debug Info:")
         print(f"   - Total ClassSubject records: {total_class_subjects}")
         print(f"   - ClassSubject records with teachers: {class_subjects_with_teachers}")
         print(f"   - Total active teachers: {total_teachers}")
