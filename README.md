@@ -58,7 +58,7 @@ student_portal/
 │   ├── urls.py
 │   └── wsgi.py
 │
-├── accounts/        # Authentication and role management (admin, teacher)
+├── accounts/        # Authentication and role management (admin, teacher and student)
 │   ├── models.py
 │   ├── views.py
 │   ├── urls.py
@@ -73,7 +73,7 @@ student_portal/
 │   ├── templates/academics/
 │   └── admin.py
 │
-├── results/         # ----> moved to academics so this foldeoesn't exist anymore
+├── results/         # ----> moved to academics so this folder doesn't exist anymore
 │   ├── models.py
 │   ├── views.py
 │   ├── urls.py
